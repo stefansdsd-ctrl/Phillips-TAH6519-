@@ -1,0 +1,8 @@
+{
+  "name": "Philips TAH6519",
+  "description": "Sound enhancement app voor de Philips TAH6519 over-ear ANC koptelefoon",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
