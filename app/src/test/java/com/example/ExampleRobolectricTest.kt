@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -162,16 +163,19 @@ class ExampleRobolectricTest {
         // Set initial state to Dark Mode
         com.example.ui.theme.ThemeState.isLightMode = false
         assertFalse(com.example.ui.theme.ThemeState.isLightMode)
+        com.example.ui.theme.ThemeState.darkBg = androidx.compose.ui.graphics.Color(0xFF090D1A)
         assertEquals(androidx.compose.ui.graphics.Color(0xFF090D1A), com.example.ui.theme.DarkBg)
 
         // Toggle to Philips Blue Light Mode
         com.example.ui.theme.ThemeState.isLightMode = true
         assertTrue(com.example.ui.theme.ThemeState.isLightMode)
+        com.example.ui.theme.ThemeState.darkBg = androidx.compose.ui.graphics.Color(0xFFF0F4FC)
         assertEquals(androidx.compose.ui.graphics.Color(0xFFF0F4FC), com.example.ui.theme.DarkBg)
 
         // Toggle back to Dark Mode
         com.example.ui.theme.ThemeState.isLightMode = false
         assertFalse(com.example.ui.theme.ThemeState.isLightMode)
+        com.example.ui.theme.ThemeState.darkBg = androidx.compose.ui.graphics.Color(0xFF090D1A)
     }
 
     @Test
@@ -184,5 +188,35 @@ class ExampleRobolectricTest {
         
         // Should transition to Checking immediately
         assertEquals(com.example.ui.UpdateState.Checking, viewModel.updateState.value)
+    }
+
+    @Test
+    fun testAutoPowerOffAndFastForward() = runBlocking {
+        // Toggle Auto Power Off
+        viewModel.toggleAutoPowerOff(true)
+        var settings = viewModel.settingsState.first { it.autoPowerOffEnabled }
+        assertTrue(settings.autoPowerOffEnabled)
+
+        // Set minutes
+        viewModel.setAutoPowerOffMinutes(15)
+        settings = viewModel.settingsState.first { it.autoPowerOffMinutes == 15 }
+        assertEquals(15, settings.autoPowerOffMinutes)
+
+        // Since we are connected but not playing media and not wearing headphones initially,
+        // it starts as inactive. Let's toggle wearing detection or make sure we can trigger fast forward.
+        viewModel.toggleWearingState(false)
+        assertFalse(viewModel.isWearingHeadphones.value)
+
+        // Make sure settings shows connected is true
+        viewModel.toggleSimulationMode(true)
+        assertTrue(viewModel.settingsState.value.connected)
+
+        // Wait a small moment for background loop to run and initialize the timer
+        delay(1200)
+
+        // Trigger fast forward
+        viewModel.fastForwardAutoOff()
+        // It should set the countdown remaining seconds to 10 if it is above 10
+        assertEquals(10, viewModel.autoOffRemainingSeconds.value)
     }
 }

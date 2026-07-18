@@ -35,7 +35,21 @@ data class HeadphoneSettings(
     val soundZonesEnabled: Boolean = false,
     val activeSoundZone: String = "Uit", // "Uit", "Thuis", "Kantoor", "Sportschool", "Trein"
     val adaptiveActivityEnabled: Boolean = false,
-    val activeActivity: String = "Zitten" // "Zitten", "Wandelen", "Hardlopen", "Reizen"
+    val activeActivity: String = "Zitten", // "Zitten", "Wandelen", "Hardlopen", "Reizen"
+    // Premium Web-informed features
+    val sidetoneEnabled: Boolean = false,
+    val sidetoneLevel: Int = 50,
+    val wearingDetectionEnabled: Boolean = true,
+    val windNoiseReductionEnabled: Boolean = false,
+    
+    // Touch Controls
+    val touchControlsEnabled: Boolean = true,
+    val touchSingleTapAction: String = "Afspelen/Pauzeren",
+    val touchDoubleTapAction: String = "Volgende track",
+    val touchHoldAction: String = "ANC Wisselen",
+    
+    // Battery Health
+    val batteryHealthEnabled: Boolean = false
 ) {
     fun getBands(): List<Float> {
         return listOf(

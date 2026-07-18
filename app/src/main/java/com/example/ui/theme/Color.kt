@@ -5,33 +5,197 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 
-object ThemeState {
-    var isLightMode by mutableStateOf(false)
+enum class AppTheme {
+    PHILIPS_STUDIO, // Royal Blue & Sky Blue
+    CYBERPUNK_NEON, // Neon Violet & Electric Cyan
+    CARBON_AMBER,   // Jet Black & Warm Amber Gold
+    NORDIC_FROST,   // Deep Slate & Aurora Green
+    HIGH_CONTRAST   // High-Contrast Pure Black & Pure White/Yellow
 }
 
-val DarkBg: Color
-    get() = if (ThemeState.isLightMode) Color(0xFFF0F4FC) else Color(0xFF090D1A)
+object ThemeState {
+    var isLightMode by mutableStateOf(false)
+    var activeTheme by mutableStateOf(AppTheme.PHILIPS_STUDIO)
 
-val DarkPanel: Color
-    get() = if (ThemeState.isLightMode) Color(0xFFFFFFFF) else Color(0xFF10172A)
+    // Animated color states (instantly accessible anywhere as regular Colors!)
+    var darkBg by mutableStateOf(Color(0xFF090D1A))
+    var darkPanel by mutableStateOf(Color(0xFF10172A))
+    var darkCard by mutableStateOf(Color(0xFF1E2942))
+    var darkBorder by mutableStateOf(Color(0xFF2B3A5E))
+    var accentPrimary by mutableStateOf(Color(0xFF0066FF))
+    var highlightSky by mutableStateOf(Color(0xFF4FA1FF))
+    var textPrimary by mutableStateOf(Color(0xFFF1F5FA))
+    var textMuted by mutableStateOf(Color(0xFF90A4C4))
+}
 
-val DarkCard: Color
-    get() = if (ThemeState.isLightMode) Color(0xFFE4EFFE) else Color(0xFF1E2942)
+val DarkBg: Color get() = ThemeState.darkBg
+val DarkPanel: Color get() = ThemeState.darkPanel
+val DarkCard: Color get() = ThemeState.darkCard
+val DarkBorder: Color get() = ThemeState.darkBorder
+val AccentPrimary: Color get() = ThemeState.accentPrimary
+val HighlightSky: Color get() = ThemeState.highlightSky
+val TextPrimary: Color get() = ThemeState.textPrimary
+val TextMuted: Color get() = ThemeState.textMuted
 
-val DarkBorder: Color
-    get() = if (ThemeState.isLightMode) Color(0xFFCCDDF7) else Color(0xFF2B3A5E)
+fun getStaticDarkBg(isLightMode: Boolean, activeTheme: AppTheme): Color {
+    return if (isLightMode) {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFFF0F4FC)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFFFAF5FF)
+            AppTheme.CARBON_AMBER -> Color(0xFFFFFBEB)
+            AppTheme.NORDIC_FROST -> Color(0xFFF0FDF4)
+            AppTheme.HIGH_CONTRAST -> Color(0xFFFFFFFF)
+        }
+    } else {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF090D1A)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFF0D061A)
+            AppTheme.CARBON_AMBER -> Color(0xFF0A0A0A)
+            AppTheme.NORDIC_FROST -> Color(0xFF0B1211)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF000000)
+        }
+    }
+}
 
-val AccentPrimary: Color
-    get() = if (ThemeState.isLightMode) Color(0xFF0054E6) else Color(0xFF0066FF)
+fun getStaticDarkPanel(isLightMode: Boolean, activeTheme: AppTheme): Color {
+    return if (isLightMode) {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFFFFFFFF)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFFFFFFFF)
+            AppTheme.CARBON_AMBER -> Color(0xFFFFFFFF)
+            AppTheme.NORDIC_FROST -> Color(0xFFFFFFFF)
+            AppTheme.HIGH_CONTRAST -> Color(0xFFFFFFFF)
+        }
+    } else {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF10172A)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFF150B26)
+            AppTheme.CARBON_AMBER -> Color(0xFF141414)
+            AppTheme.NORDIC_FROST -> Color(0xFF111D1B)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF0D0D0D)
+        }
+    }
+}
 
-val HighlightSky: Color
-    get() = if (ThemeState.isLightMode) Color(0xFF007BFF) else Color(0xFF4FA1FF)
+fun getStaticDarkCard(isLightMode: Boolean, activeTheme: AppTheme): Color {
+    return if (isLightMode) {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFFE4EFFE)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFFF3E8FF)
+            AppTheme.CARBON_AMBER -> Color(0xFFFEF3C7)
+            AppTheme.NORDIC_FROST -> Color(0xFFDCFCE7)
+            AppTheme.HIGH_CONTRAST -> Color(0xFFE2E8F0)
+        }
+    } else {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF1E2942)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFF25143E)
+            AppTheme.CARBON_AMBER -> Color(0xFF222222)
+            AppTheme.NORDIC_FROST -> Color(0xFF192C28)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF1A1A1A)
+        }
+    }
+}
 
-val TextPrimary: Color
-    get() = if (ThemeState.isLightMode) Color(0xFF0F172A) else Color(0xFFF1F5FA)
+fun getStaticDarkBorder(isLightMode: Boolean, activeTheme: AppTheme): Color {
+    return if (isLightMode) {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFFCCDDF7)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFFE8D5FF)
+            AppTheme.CARBON_AMBER -> Color(0xFFFDE68A)
+            AppTheme.NORDIC_FROST -> Color(0xFFBBF7D0)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF000000)
+        }
+    } else {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF2B3A5E)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFF3B1E63)
+            AppTheme.CARBON_AMBER -> Color(0xFF333333)
+            AppTheme.NORDIC_FROST -> Color(0xFF243F3A)
+            AppTheme.HIGH_CONTRAST -> Color(0xFFFFFFFF)
+        }
+    }
+}
 
-val TextMuted: Color
-    get() = if (ThemeState.isLightMode) Color(0xFF576F93) else Color(0xFF90A4C4)
+fun getStaticAccentPrimary(isLightMode: Boolean, activeTheme: AppTheme): Color {
+    return if (isLightMode) {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF0054E6)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFFD946EF)
+            AppTheme.CARBON_AMBER -> Color(0xFFD97706)
+            AppTheme.NORDIC_FROST -> Color(0xFF16A34A)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF0000FF)
+        }
+    } else {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF0066FF)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFFE047FF)
+            AppTheme.CARBON_AMBER -> Color(0xFFF59E0B)
+            AppTheme.NORDIC_FROST -> Color(0xFF10B981)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF00FFFF)
+        }
+    }
+}
+
+fun getStaticHighlightSky(isLightMode: Boolean, activeTheme: AppTheme): Color {
+    return if (isLightMode) {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF007BFF)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFF06B6D4)
+            AppTheme.CARBON_AMBER -> Color(0xFFB45309)
+            AppTheme.NORDIC_FROST -> Color(0xFF0891B2)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF0000FF)
+        }
+    } else {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF4FA1FF)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFF00F0FF)
+            AppTheme.CARBON_AMBER -> Color(0xFFFBBF24)
+            AppTheme.NORDIC_FROST -> Color(0xFF2DD4BF)
+            AppTheme.HIGH_CONTRAST -> Color(0xFFFFCC00)
+        }
+    }
+}
+
+fun getStaticTextPrimary(isLightMode: Boolean, activeTheme: AppTheme): Color {
+    return if (isLightMode) {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF0F172A)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFF1E1B4B)
+            AppTheme.CARBON_AMBER -> Color(0xFF27272A)
+            AppTheme.NORDIC_FROST -> Color(0xFF14532D)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF000000)
+        }
+    } else {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFFF1F5FA)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFFFDF8FF)
+            AppTheme.CARBON_AMBER -> Color(0xFFFAFAF9)
+            AppTheme.NORDIC_FROST -> Color(0xFFECFDF5)
+            AppTheme.HIGH_CONTRAST -> Color(0xFFFFFFFF)
+        }
+    }
+}
+
+fun getStaticTextMuted(isLightMode: Boolean, activeTheme: AppTheme): Color {
+    return if (isLightMode) {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF576F93)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFF7E22CE)
+            AppTheme.CARBON_AMBER -> Color(0xFF78350F)
+            AppTheme.NORDIC_FROST -> Color(0xFF15803D)
+            AppTheme.HIGH_CONTRAST -> Color(0xFF334155)
+        }
+    } else {
+        when (activeTheme) {
+            AppTheme.PHILIPS_STUDIO -> Color(0xFF90A4C4)
+            AppTheme.CYBERPUNK_NEON -> Color(0xFFB197FC)
+            AppTheme.CARBON_AMBER -> Color(0xFFA8A29E)
+            AppTheme.NORDIC_FROST -> Color(0xFF86EFAC)
+            AppTheme.HIGH_CONTRAST -> Color(0xFFCBD5E1)
+        }
+    }
+}
 
 val StatusDanger = Color(0xFFFF4D6D)
 val StatusSuccess = Color(0xFF00C896)
