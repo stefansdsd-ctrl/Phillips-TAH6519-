@@ -1,5 +1,19 @@
 package com.example
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.sharp.*
+import androidx.compose.material.icons.twotone.*
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.automirrored.rounded.*
+
+
+
+
+
 import com.example.ui.FullScreenMediaDashboard
 
 
@@ -22,11 +36,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +48,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.example.R
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -88,6 +99,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun HeadphoneApp(viewModel: HeadphoneViewModel) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     LaunchedEffect(Unit) {
         viewModel.shouldCloseApp.collect { shouldClose ->
             if (shouldClose) {
@@ -131,7 +143,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
     val autoOffRemainingSeconds by viewModel.autoOffRemainingSeconds.collectAsStateWithLifecycle()
     val autoOffIsInactive by viewModel.autoOffIsInactive.collectAsStateWithLifecycle()
     var activeTab by remember { mutableStateOf("dash") }
-    var eqBandMode by remember { mutableStateOf("3-BAND") }
+    var eqBandMode by remember { mutableStateOf("5-BAND") }
     var showPairingGuide by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var hasPromptedForUpdate by remember { mutableStateOf(false) }
@@ -263,7 +275,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Headphones,
+                                    imageVector = Icons.Filled.Headphones,
                                     contentDescription = "Philips TAH6519 Logo",
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
@@ -348,7 +360,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                         ) {
                             val isHC = !ThemeState.isLightMode && ThemeState.activeTheme == com.example.ui.theme.AppTheme.HIGH_CONTRAST
                             Icon(
-                                imageVector = if (isHC) Icons.Default.WbSunny else Icons.Default.NightsStay,
+                                imageVector = if (isHC) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
                                 contentDescription = "Thema omschakelen",
                                 tint = if (isHC) AccentPrimary else TextMuted,
                                 modifier = Modifier.size(20.dp)
@@ -364,7 +376,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 .testTag("settings_button")
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Settings,
+                                imageVector = Icons.Filled.Settings,
                                 contentDescription = "Instellingen",
                                 tint = TextMuted,
                                 modifier = Modifier.size(20.dp)
@@ -453,7 +465,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Check,
+                                        imageVector = Icons.Filled.Check,
                                         contentDescription = "Connected",
                                         tint = StatusSuccess,
                                         modifier = Modifier.size(14.dp)
@@ -502,7 +514,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.BatteryAlert,
+                                        imageVector = Icons.Filled.BatteryAlert,
                                         contentDescription = "Battery Alert",
                                         tint = StatusDanger,
                                         modifier = Modifier.size(18.dp)
@@ -551,7 +563,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.CheckCircle,
+                                            imageVector = Icons.Filled.CheckCircle,
                                             contentDescription = "Safe",
                                             tint = StatusSuccess,
                                             modifier = Modifier.size(14.dp)
@@ -593,15 +605,18 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                 tonalElevation = 16.dp
             ) {
                 val tabs = listOf(
-                    Triple("dash", "Thuis", Icons.Default.Dashboard),
-                    Triple("media", "Media", Icons.Default.MusicNote),
-                    Triple("audio", "Audio", Icons.Default.GraphicEq),
-                    Triple("device", "Systeem", Icons.Default.Settings)
+                    Triple("dash", "Thuis", Icons.Filled.Dashboard),
+                    Triple("media", "Media", Icons.Filled.MusicNote),
+                    Triple("audio", "Audio", Icons.Filled.GraphicEq),
+                    Triple("device", "Systeem", Icons.Filled.Settings)
                 )
                 tabs.forEach { (tabId, label, icon) ->
                     NavigationBarItem(
                         selected = activeTab == tabId,
-                        onClick = { activeTab = tabId },
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            activeTab = tabId 
+                        },
                         icon = { Icon(imageVector = icon, contentDescription = label) },
                         label = { Text(text = label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
                         colors = NavigationBarItemDefaults.colors(
@@ -730,7 +745,14 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                             FrequencyResponseGraph(bands = settings.getBands())
                         }
                         item {
-                            SectionHeader(title = "Presets")
+                            SectionHeader(title = "Aanbevolen Sound Profiles")
+                            PremiumSoundProfileSelector(
+                                activePreset = settings.activePreset,
+                                onPresetSelected = { viewModel.setPreset(it) }
+                            )
+                        }
+                        item {
+                            SectionHeader(title = "Systeem Presets")
                             PresetsGrid(
                                 activePreset = settings.activePreset,
                                 presets = viewModel.presets,
@@ -750,6 +772,11 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                     onRenamePreset = { old, new -> viewModel.renameCustomPreset(old, new) }
                                 )
                             }
+                        }
+
+                        item {
+                            SectionHeader(title = "Geavanceerde Sound Tuning")
+                            AdvancedAudioEnhancements(viewModel, settings)
                         }
 
                         item {
@@ -860,7 +887,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                         }
                                     }
                                 } else if (eqBandMode == "5-BAND") {
-                                    val bandLabels = listOf("Bass", "Lo-Mid", "Mid", "Hi-Mid", "Treble")
+                                    val bandLabels = listOf("60Hz", "250Hz", "1kHz", "4kHz", "16kHz")
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -955,8 +982,10 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                                 .height(52.dp)
                                                 .testTag("save_preset_input")
                                         )
+                                        val saveHaptic = LocalHapticFeedback.current
                                         Button(
                                             onClick = {
+                                                saveHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 if (newPresetName.isNotBlank()) {
                                                     viewModel.saveCustomPreset(newPresetName, settings.getBands())
                                                     newPresetName = ""
@@ -1123,7 +1152,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Hearing,
+                                                imageVector = Icons.Filled.Hearing,
                                                 contentDescription = "Transparency",
                                                 tint = HighlightSky,
                                                 modifier = Modifier.size(20.dp)
@@ -1306,9 +1335,16 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
+                                        val haptic = LocalHapticFeedback.current
                                         Slider(
                                             value = settings.sidetoneLevel.toFloat(),
-                                            onValueChange = { viewModel.setSidetoneLevel(it.toInt()) },
+                                            onValueChange = { 
+                                                val intVal = it.toInt()
+                                                if (intVal != settings.sidetoneLevel) {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                }
+                                                viewModel.setSidetoneLevel(intVal) 
+                                            },
                                             valueRange = 0f..100f,
                                             colors = SliderDefaults.colors(
                                                 activeTrackColor = HighlightSky,
@@ -1483,7 +1519,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                             )
                                         }
                                         Icon(
-                                            imageVector = Icons.Default.Palette,
+                                            imageVector = Icons.Filled.Palette,
                                             contentDescription = "Thema",
                                             tint = AccentPrimary,
                                             modifier = Modifier.size(24.dp)
@@ -1575,7 +1611,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
-                                                    imageVector = Icons.Default.Compare,
+                                                    imageVector = Icons.Filled.Compare,
                                                     contentDescription = null,
                                                     tint = if (ThemeState.activeTheme == com.example.ui.theme.AppTheme.HIGH_CONTRAST) Color.Black else Color.White,
                                                     modifier = Modifier.size(18.dp)
@@ -1955,7 +1991,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.BluetoothDisabled,
+                                            imageVector = Icons.Filled.BluetoothDisabled,
                                             contentDescription = "Geen Verbinding",
                                             tint = TextMuted,
                                             modifier = Modifier.size(48.dp)
@@ -2137,7 +2173,10 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
 
                                                 if (autoOffIsInactive && autoOffRemainingSeconds > 10) {
                                                     Button(
-                                                        onClick = { viewModel.fastForwardAutoOff() },
+                                                        onClick = { 
+                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            viewModel.fastForwardAutoOff() 
+                                                        },
                                                         colors = ButtonDefaults.buttonColors(
                                                             containerColor = StatusYellow.copy(alpha = 0.15f),
                                                             contentColor = StatusYellow
@@ -2287,7 +2326,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.BatteryAlert,
+                                imageVector = Icons.Filled.BatteryAlert,
                                 contentDescription = "Laag Batterijniveau",
                                 tint = StatusDanger,
                                 modifier = Modifier.size(20.dp)
@@ -2317,7 +2356,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 .testTag("btn_dismiss_battery_toast")
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
+                                imageVector = Icons.Filled.Close,
                                 contentDescription = "Sluit Melding",
                                 tint = TextMuted,
                                 modifier = Modifier.size(16.dp)
@@ -2379,7 +2418,7 @@ fun MiniBatteryIndicator(
             // If charging, overlay dynamic pulse/flash or icon
             if (isCharging) {
                 Icon(
-                    imageVector = Icons.Default.FlashOn,
+                    imageVector = Icons.Filled.FlashOn,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier
@@ -2768,6 +2807,488 @@ fun PresetsGrid(
 }
 
 @Composable
+fun PremiumSoundProfileSelector(
+    activePreset: String?,
+    onPresetSelected: (String) -> Unit
+) {
+    val profiles = listOf(
+        Triple("Balanced", "Studio Balans", "Natuurlijk lineair en kraakhelder geluid met perfecte harmonie. Ideaal voor alle genres."),
+        Triple("Bass Boost", "Dynamic Deep Bass", "Klinkt warm en vol met diepe, voelbare basfrequenties. Perfect voor EDM, Hip-Hop en Pop."),
+        Triple("Voice Clarity", "Stem Helderheid", "Versterkt zang en spraak terwijl omgevingsgeluid wordt gedempt. Ideaal voor podcasts en calls.")
+    )
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        profiles.forEach { (key, title, desc) ->
+            val isSelected = activePreset == key
+            val borderAnimateColor by animateColorAsState(
+                targetValue = if (isSelected) HighlightSky else DarkBorder,
+                animationSpec = tween(200),
+                label = "premium_eq_border"
+            )
+            val bgAnimateColor by animateColorAsState(
+                targetValue = if (isSelected) HighlightSky.copy(alpha = 0.08f) else DarkCard,
+                animationSpec = tween(200),
+                label = "premium_eq_bg"
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = bgAnimateColor),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onPresetSelected(key) }
+                    .border(1.dp, borderAnimateColor, shape = RoundedCornerShape(16.dp))
+                    .testTag("premium_preset_$key"),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Mini Graph or Dynamic Visual Icon
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                if (isSelected) HighlightSky.copy(alpha = 0.15f) else DarkPanel,
+                                shape = RoundedCornerShape(12.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val icon = when (key) {
+                            "Balanced" -> Icons.Filled.GraphicEq
+                            "Bass Boost" -> Icons.Filled.Hearing
+                            else -> Icons.Filled.Headphones
+                        }
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = if (isSelected) HighlightSky else TextMuted,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = title,
+                                color = if (isSelected) HighlightSky else TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(HighlightSky.copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "ACTIEF",
+                                        color = HighlightSky,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = desc,
+                            color = if (isSelected) TextPrimary.copy(alpha = 0.85f) else TextMuted,
+                            fontSize = 11.sp,
+                            lineHeight = 14.sp
+                        )
+                    }
+                    
+                    // Tiny Canvas curve
+                    Box(
+                        modifier = Modifier
+                            .width(54.dp)
+                            .height(30.dp)
+                            .padding(horizontal = 2.dp)
+                    ) {
+                        val bands = when (key) {
+                            "Balanced" -> listOf(1f, 1f, 0.5f, 0f, 0f, 0.5f, 1f, 1.5f, 1.5f, 1f)
+                            "Bass Boost" -> listOf(8f, 6f, 4f, 2f, 0f, 0f, 0f, 0f, 0f, 0f)
+                            else -> listOf(-2f, -1f, 1f, 3f, 5f, 5f, 4f, 2f, -1f, -2f)
+                        }
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val w = size.width
+                            val h = size.height
+                            val points = bands.mapIndexed { i, gain ->
+                                val x = (i.toFloat() / 9f) * w
+                                val ratio = (gain + 12f) / 24f
+                                val y = h * (1f - ratio)
+                                Offset(x, y)
+                            }
+                            val path = Path().apply {
+                                moveTo(points[0].x, points[0].y)
+                                for (i in 0 until points.size - 1) {
+                                    val p0 = points[i]
+                                    val p1 = points[i + 1]
+                                    val cx = (p0.x + p1.x) / 2f
+                                    cubicTo(cx, p0.y, cx, p1.y, p1.x, p1.y)
+                                }
+                            }
+                            drawPath(
+                                path = path,
+                                color = if (isSelected) HighlightSky else AccentPrimary.copy(alpha = 0.5f),
+                                style = Stroke(width = 1.5.dp.toPx())
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AdvancedAudioEnhancements(
+    viewModel: HeadphoneViewModel,
+    settings: com.example.data.HeadphoneSettings
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, DarkBorder, shape = RoundedCornerShape(16.dp)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Feature 1: Spatial Audio / Soundstage Virtualizer
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.MusicNote,
+                                contentDescription = null,
+                                tint = HighlightSky,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Ruimtelijk Geluid (Spatial Audio)",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        
+                        // Current mode indicator badge
+                        Box(
+                            modifier = Modifier
+                                .background(HighlightSky.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = when (settings.spatialAudioMode) {
+                                    "Stereo" -> "Stereo Classic"
+                                    "Live Concert" -> "Concert Hall"
+                                    "Cinematic 3D" -> "3D Cinema"
+                                    else -> "Studio Vocal"
+                                },
+                                color = HighlightSky,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    Text(
+                        text = "Creëer een meeslepende 3D-geluidservaring door de akoestiek van de luisterruimte te simuleren.",
+                        color = TextMuted,
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp
+                    )
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val modes = listOf("Stereo", "Live Concert", "Cinematic 3D", "Acoustic Studio")
+                        modes.forEach { mode ->
+                            val isSelected = settings.spatialAudioMode == mode
+                            Button(
+                                onClick = { viewModel.setSpatialAudioMode(mode) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(28.dp)
+                                    .testTag("spatial_mode_$mode"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSelected) HighlightSky.copy(alpha = 0.2f) else DarkPanel,
+                                    contentColor = if (isSelected) HighlightSky else TextMuted
+                                ),
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = if (isSelected) HighlightSky else DarkBorder
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = when (mode) {
+                                        "Stereo" -> "Off"
+                                        "Live Concert" -> "Concert"
+                                        "Cinematic 3D" -> "Cinema"
+                                        else -> "Studio"
+                                    },
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = DarkBorder, thickness = 1.dp)
+
+                // Feature 2: High Resolution LDAC Streaming Quality
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Headphones,
+                                contentDescription = null,
+                                tint = if (settings.ldacEnabled) HighlightSky else TextMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "LDAC Hi-Res Audio Bitrate",
+                                color = if (settings.ldacEnabled) TextPrimary else TextMuted,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        
+                        Text(
+                            text = if (settings.ldacEnabled) "Actief (96kHz)" else "Inactief (SBC/AAC)",
+                            color = if (settings.ldacEnabled) StatusSuccess else TextMuted,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        text = "Beheer de Bluetooth bandbreedte. Hogere bitrate biedt studiokwaliteit, lagere biedt meer stabiliteit.",
+                        color = TextMuted,
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val bitrates = listOf("Optimized (990kbps)", "Balanced (660kbps)", "Best Effort (330kbps)")
+                        bitrates.forEach { opt ->
+                            val isSelected = settings.ldacQualityMode == opt
+                            val enabled = settings.ldacEnabled
+                            Button(
+                                onClick = { if (enabled) viewModel.setLdacQualityMode(opt) },
+                                enabled = enabled,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(28.dp)
+                                    .testTag("ldac_mode_$opt"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSelected && enabled) HighlightSky.copy(alpha = 0.2f) else if (enabled) DarkPanel else DarkPanel.copy(alpha = 0.4f),
+                                    contentColor = if (isSelected && enabled) HighlightSky else TextMuted,
+                                    disabledContainerColor = DarkPanel.copy(alpha = 0.2f),
+                                    disabledContentColor = TextMuted.copy(alpha = 0.4f)
+                                ),
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = if (isSelected && enabled) HighlightSky else DarkBorder
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = when (opt) {
+                                        "Optimized (990kbps)" -> "990k Ultra"
+                                        "Balanced (660kbps)" -> "660k HD"
+                                        else -> "330k Eco"
+                                    },
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = DarkBorder, thickness = 1.dp)
+
+                // Feature 3: Dynamic Bass Boost (DBB) Level Selector
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Hearing,
+                                contentDescription = null,
+                                tint = if (settings.dynamicBassEnabled) HighlightSky else TextMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Dynamic Bass Boost (DBB) Niveau",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+
+                        Text(
+                            text = when (settings.dynamicBassLevel) {
+                                0 -> "Uit"
+                                1 -> "Warm (+3dB)"
+                                2 -> "Punch (+6dB)"
+                                else -> "Thunder (+10dB)"
+                            },
+                            color = if (settings.dynamicBassEnabled) HighlightSky else TextMuted,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        text = "Versterk de laagste tonen in real-time. Past zich automatisch aan op het volume ter bescherming van de gehoorgang.",
+                        color = TextMuted,
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val levels = listOf(0, 1, 2, 3)
+                        levels.forEach { level ->
+                            val isSelected = settings.dynamicBassLevel == level
+                            Button(
+                                onClick = { viewModel.setDynamicBassLevel(level) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(28.dp)
+                                    .testTag("bass_level_$level"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSelected) HighlightSky.copy(alpha = 0.2f) else DarkPanel,
+                                    contentColor = if (isSelected) HighlightSky else TextMuted
+                                ),
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = if (isSelected) HighlightSky else DarkBorder
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = when (level) {
+                                        0 -> "Off"
+                                        1 -> "Warm"
+                                        2 -> "Punch"
+                                        else -> "Thunder"
+                                    },
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = DarkBorder, thickness = 1.dp)
+
+                // Feature 4: ANC Acoustic Bass Compensation Engine
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = null,
+                                tint = if (settings.ancCompensationEnabled) HighlightSky else TextMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "ANC Akoestische Compensatie",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Herstelt sub-bass drukverlies veroorzaakt door actieve ruisonderdrukking.",
+                            color = TextMuted,
+                            fontSize = 10.sp,
+                            lineHeight = 13.sp
+                        )
+                    }
+
+                    Switch(
+                        checked = settings.ancCompensationEnabled,
+                        onCheckedChange = { viewModel.toggleAncCompensation(it) },
+                        modifier = Modifier.testTag("anc_compensation_switch"),
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = HighlightSky,
+                            checkedTrackColor = HighlightSky.copy(alpha = 0.3f),
+                            uncheckedThumbColor = TextMuted,
+                            uncheckedTrackColor = DarkPanel
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun VerticalEqSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
@@ -2965,9 +3486,16 @@ fun MasterGainSlider(
                     fontWeight = FontWeight.Bold
                 )
             }
+            val haptic = LocalHapticFeedback.current
             Slider(
                 value = gain,
-                onValueChange = { onGainChange(it) },
+                onValueChange = { 
+                    val intVal = it.toInt()
+                    if (intVal != gain.toInt()) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    onGainChange(it) 
+                },
                 valueRange = -6f..6f,
                 steps = 23, // 0.5f intervals
                 colors = SliderDefaults.colors(
@@ -3141,8 +3669,8 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 
 fun getBatteryIcon(level: Int): ImageVector {
     return when {
-        level <= 20 -> Icons.Default.BatteryAlert
-        else -> Icons.Default.BatteryFull
+        level <= 20 -> Icons.Filled.BatteryAlert
+        else -> Icons.Filled.BatteryFull
     }
 }
 
@@ -3181,7 +3709,7 @@ fun LowBatteryAlert(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Warning,
+                    imageVector = Icons.Filled.Warning,
                     contentDescription = "Waarschuwing batterij bijna leeg",
                     tint = StatusDanger.copy(alpha = alertAlpha),
                     modifier = Modifier.size(20.dp)
@@ -3211,7 +3739,7 @@ fun LowBatteryAlert(
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                        imageVector = Icons.Filled.CheckCircle,
                         contentDescription = "Smart Saver Actief",
                         tint = StatusSuccess,
                         modifier = Modifier.size(16.dp)
@@ -3242,7 +3770,7 @@ fun LowBatteryAlert(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Bolt,
+                            imageVector = Icons.Filled.Bolt,
                             contentDescription = "Bolt icon",
                             tint = Color.White,
                             modifier = Modifier.size(14.dp)
@@ -3285,7 +3813,7 @@ fun BatteryFetcherComponent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Refresh,
+                    imageVector = Icons.Filled.Refresh,
                     contentDescription = null,
                     tint = if (isFetchingBattery) HighlightSky else TextPrimary,
                     modifier = Modifier.size(16.dp)
@@ -3440,7 +3968,7 @@ fun VisualBatteryCard(
                     .padding(vertical = 12.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.BatteryUnknown,
+                    imageVector = Icons.Filled.BatteryUnknown,
                     contentDescription = "Batterij onbekend",
                     tint = TextMuted,
                     modifier = Modifier.size(40.dp)
@@ -3474,9 +4002,9 @@ fun VisualBatteryCard(
                     ) {
                         Icon(
                             imageVector = when {
-                                isCharging -> Icons.Default.BatteryChargingFull
-                                batteryLevel <= 20 -> Icons.Default.BatteryAlert
-                                else -> Icons.Default.BatteryFull
+                                isCharging -> Icons.Filled.BatteryChargingFull
+                                batteryLevel <= 20 -> Icons.Filled.BatteryAlert
+                                else -> Icons.Filled.BatteryFull
                             },
                             contentDescription = "Batterij status",
                             tint = when {
@@ -3513,7 +4041,7 @@ fun VisualBatteryCard(
                     ) {
                         if (isCharging) {
                             Icon(
-                                imageVector = Icons.Default.FlashOn,
+                                imageVector = Icons.Filled.FlashOn,
                                 contentDescription = "Opladen",
                                 tint = AccentPrimary,
                                 modifier = Modifier
@@ -3632,7 +4160,7 @@ fun VisualBatteryCard(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AccessTime,
+                                imageVector = Icons.Filled.AccessTime,
                                 contentDescription = "Tijd resterend",
                                 tint = HighlightSky,
                                 modifier = Modifier.size(14.dp)
@@ -3705,7 +4233,7 @@ fun VisualBatteryCard(
                     // Consumer 1: ANC
                     PowerConsumerRow(
                         label = "Actieve Ruisonderdrukking (ANC)",
-                        icon = Icons.Default.GraphicEq,
+                        icon = Icons.Filled.GraphicEq,
                         isActive = ancMode != "OFF",
                         drainText = if (ancMode != "OFF") "-40u accuduur" else "+40u bespaard",
                         isPositive = ancMode == "OFF"
@@ -3714,7 +4242,7 @@ fun VisualBatteryCard(
                     // Consumer 2: LDAC
                     PowerConsumerRow(
                         label = "Hi-Res LDAC Codec",
-                        icon = Icons.Default.MusicNote,
+                        icon = Icons.Filled.MusicNote,
                         isActive = ldacEnabled,
                         drainText = if (ldacEnabled) "-20u accuduur" else "+20u bespaard",
                         isPositive = !ldacEnabled
@@ -3723,7 +4251,7 @@ fun VisualBatteryCard(
                     // Consumer 3: Bass Boost
                     PowerConsumerRow(
                         label = "Dynamic Bass Boost",
-                        icon = Icons.Default.Hearing,
+                        icon = Icons.Filled.Hearing,
                         isActive = bassEnabled,
                         drainText = if (bassEnabled) "-4u accuduur" else "Zuinig",
                         isPositive = !bassEnabled
@@ -3810,9 +4338,13 @@ fun VisualBatteryCard(
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
+                            val switchHaptic = LocalHapticFeedback.current
                             Switch(
                                 checked = isCharging,
-                                onCheckedChange = { onToggleCharging(it) },
+                                onCheckedChange = { 
+                                    switchHaptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onToggleCharging(it) 
+                                },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = AccentPrimary,
                                     checkedTrackColor = AccentPrimary.copy(alpha = 0.4f),
@@ -3827,9 +4359,16 @@ fun VisualBatteryCard(
                         }
                     }
                     
+                    val haptic = LocalHapticFeedback.current
                     Slider(
                         value = batteryLevel.toFloat(),
-                        onValueChange = { onBatteryChange(it.toInt()) },
+                        onValueChange = { 
+                            val intVal = it.toInt()
+                            if (intVal != batteryLevel) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            onBatteryChange(intVal) 
+                        },
                         valueRange = 0f..100f,
                         colors = SliderDefaults.colors(
                             activeTrackColor = AccentPrimary,
@@ -4165,9 +4704,9 @@ fun NoiseControlToggle(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             val modes = listOf(
-                Triple("ON", "ANC On", Icons.Default.GraphicEq),
-                Triple("TRANSPARENCY", "Awareness", Icons.Default.Hearing),
-                Triple("OFF", "ANC Off", Icons.Default.Close)
+                Triple("ON", "ANC On", Icons.Filled.GraphicEq),
+                Triple("TRANSPARENCY", "Awareness", Icons.Filled.Hearing),
+                Triple("OFF", "ANC Off", Icons.Filled.Close)
             )
 
             modes.forEach { (mode, label, icon) ->
@@ -4295,7 +4834,7 @@ fun MultipointCard(
                     .padding(vertical = 12.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Devices,
+                    imageVector = Icons.Filled.Devices,
                     contentDescription = "Bluetooth Multipoint",
                     tint = TextMuted,
                     modifier = Modifier.size(40.dp)
@@ -4329,7 +4868,7 @@ fun MultipointCard(
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Devices,
+                            imageVector = Icons.Filled.Devices,
                             contentDescription = "Multipoint",
                             tint = AccentPrimary,
                             modifier = Modifier.size(20.dp)
@@ -4396,10 +4935,10 @@ fun MultipointCard(
                                     deviceName.contains("MacBook", ignoreCase = true) || 
                                     deviceName.contains("Laptop", ignoreCase = true) ||
                                     deviceName.contains("PC", ignoreCase = true) ||
-                                    deviceName.contains("Computer", ignoreCase = true) -> Icons.Default.Laptop
+                                    deviceName.contains("Computer", ignoreCase = true) -> Icons.Filled.Laptop
                                     deviceName.contains("TV", ignoreCase = true) ||
-                                    deviceName.contains("Television", ignoreCase = true) -> Icons.Default.Tv
-                                    else -> Icons.Default.PhoneAndroid
+                                    deviceName.contains("Television", ignoreCase = true) -> Icons.Filled.Tv
+                                    else -> Icons.Filled.PhoneAndroid
                                 }
 
                                 Row(
@@ -4479,7 +5018,7 @@ fun MultipointCard(
                                                 modifier = Modifier.size(28.dp).testTag("btn_swap_priority")
                                             ) {
                                                 Icon(
-                                                    imageVector = Icons.Default.SwapVert,
+                                                    imageVector = Icons.Filled.SwapVert,
                                                     contentDescription = "Wissel prioriteit",
                                                     tint = HighlightSky,
                                                     modifier = Modifier.size(16.dp)
@@ -4492,7 +5031,7 @@ fun MultipointCard(
                                             modifier = Modifier.size(28.dp).testTag("btn_remove_device_$index")
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Close,
+                                                imageVector = Icons.Filled.Close,
                                                 contentDescription = "Verbreek verbinding",
                                                 tint = StatusDanger,
                                                 modifier = Modifier.size(16.dp)
@@ -4524,7 +5063,7 @@ fun MultipointCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Add,
+                                    imageVector = Icons.Filled.Add,
                                     contentDescription = "Nieuw koppelen",
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -4541,7 +5080,7 @@ fun MultipointCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Info,
+                                imageVector = Icons.Filled.Info,
                                 contentDescription = "Info",
                                 tint = TextMuted,
                                 modifier = Modifier.size(12.dp)
@@ -4783,7 +5322,7 @@ fun CustomPresetsGrid(
                                 modifier = Modifier.size(36.dp).testTag("preset_options_$name")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.MoreVert,
+                                    imageVector = Icons.Filled.MoreVert,
                                     contentDescription = "Opties voor $name",
                                     tint = TextMuted,
                                     modifier = Modifier.size(16.dp)
@@ -4798,7 +5337,7 @@ fun CustomPresetsGrid(
                                     text = { Text("Hernoemen", color = TextPrimary) },
                                     leadingIcon = {
                                         Icon(
-                                            Icons.Default.Edit,
+                                            Icons.Filled.Edit,
                                             contentDescription = "Hernoemen",
                                             tint = AccentPrimary,
                                             modifier = Modifier.size(16.dp)
@@ -4815,7 +5354,7 @@ fun CustomPresetsGrid(
                                     text = { Text("Verwijderen", color = StatusDanger) },
                                     leadingIcon = {
                                         Icon(
-                                            Icons.Default.Delete,
+                                            Icons.Filled.Delete,
                                             contentDescription = "Verwijderen",
                                             tint = StatusDanger,
                                             modifier = Modifier.size(16.dp)
@@ -4863,7 +5402,7 @@ fun HearingTestCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Hearing,
+                    imageVector = Icons.Filled.Hearing,
                     contentDescription = "Gehoor-ID",
                     tint = HighlightSky,
                     modifier = Modifier.size(22.dp)
@@ -4902,7 +5441,7 @@ fun HearingTestCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                        imageVector = Icons.Filled.CheckCircle,
                         contentDescription = "Actief",
                         tint = StatusSuccess,
                         modifier = Modifier.size(16.dp)
@@ -4983,7 +5522,7 @@ fun HearingTestWizardDialog(
                         fontSize = 15.sp
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Sluit", tint = TextMuted)
+                        Icon(imageVector = Icons.Filled.Close, contentDescription = "Sluit", tint = TextMuted)
                     }
                 }
                 
@@ -4992,7 +5531,7 @@ fun HearingTestWizardDialog(
                 if (step == 0) {
                     // Introduction
                     Icon(
-                        imageVector = Icons.Default.SelfImprovement,
+                        imageVector = Icons.Filled.SelfImprovement,
                         contentDescription = "Stilte",
                         tint = HighlightSky,
                         modifier = Modifier.size(56.dp)
@@ -5067,7 +5606,7 @@ fun HearingTestWizardDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.GraphicEq,
+                                imageVector = Icons.Filled.GraphicEq,
                                 contentDescription = "Pulsing tone",
                                 tint = Color.White,
                                 modifier = Modifier.size(32.dp)
@@ -5110,9 +5649,16 @@ fun HearingTestWizardDialog(
                                 fontWeight = FontWeight.Bold
                             )
                         }
+                        val haptic = LocalHapticFeedback.current
                         Slider(
                             value = currentSliderVal,
-                            onValueChange = { currentSliderVal = it },
+                            onValueChange = { 
+                                val intVal = it.toInt()
+                                if (intVal != currentSliderVal.toInt()) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                currentSliderVal = it 
+                            },
                             valueRange = 0f..100f,
                             colors = SliderDefaults.colors(
                                 thumbColor = AccentPrimary,
@@ -5146,7 +5692,7 @@ fun HearingTestWizardDialog(
                 } else {
                     // step 5: Results calculation & saving
                     Icon(
-                        imageVector = Icons.Default.Analytics,
+                        imageVector = Icons.Filled.Analytics,
                         contentDescription = "Resultaat",
                         tint = StatusSuccess,
                         modifier = Modifier.size(48.dp)
@@ -5298,7 +5844,7 @@ fun ZenSoundscapesCard() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Spa,
+                        imageVector = Icons.Filled.Spa,
                         contentDescription = "Zen Soundscapes",
                         tint = StatusPurple,
                         modifier = Modifier.size(22.dp)
@@ -5405,7 +5951,7 @@ fun ZenSoundscapesCard() {
                             .testTag("btn_toggle_soundscape")
                     ) {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = "Speel af of pauzeer soundscape",
                             tint = if (isPlaying) Color.White else TextPrimary,
                             modifier = Modifier.size(20.dp)
@@ -5431,7 +5977,7 @@ fun ZenSoundscapesCard() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.Timer, contentDescription = "Timer", tint = TextMuted, modifier = Modifier.size(16.dp))
+                    Icon(imageVector = Icons.Filled.Timer, contentDescription = "Timer", tint = TextMuted, modifier = Modifier.size(16.dp))
                     Text(text = "Timer:", color = TextMuted, fontSize = 11.sp)
                     
                     Box(
@@ -5495,9 +6041,16 @@ fun ZenSoundscapesCard() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(imageVector = Icons.AutoMirrored.Outlined.VolumeUp, contentDescription = "Volume", tint = TextMuted, modifier = Modifier.size(14.dp))
+                val haptic = LocalHapticFeedback.current
                 Slider(
                     value = soundVolume,
-                    onValueChange = { soundVolume = it },
+                    onValueChange = { 
+                        val intVal = it.toInt()
+                        if (intVal != soundVolume.toInt()) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        }
+                        soundVolume = it 
+                    },
                     valueRange = 0f..100f,
                     colors = SliderDefaults.colors(
                         activeTrackColor = StatusPurple,
@@ -5552,7 +6105,7 @@ fun HearingHealthCard() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Analytics,
+                        imageVector = Icons.Filled.Analytics,
                         contentDescription = "Gehoorbescherming",
                         tint = StatusYellow,
                         modifier = Modifier.size(22.dp)
@@ -5787,7 +6340,7 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.SystemUpdate,
+                        imageVector = Icons.Filled.SystemUpdate,
                         contentDescription = "Firmware",
                         tint = HighlightSky,
                         modifier = Modifier.size(22.dp)
@@ -5892,7 +6445,7 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                                 .padding(10.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CheckCircle,
+                                imageVector = Icons.Filled.CheckCircle,
                                 contentDescription = "Up to date",
                                 tint = StatusSuccess,
                                 modifier = Modifier.size(16.dp)
@@ -5930,7 +6483,7 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                                 .padding(10.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Info,
+                                imageVector = Icons.Filled.Info,
                                 contentDescription = "Update available",
                                 tint = StatusYellow,
                                 modifier = Modifier.size(16.dp)
@@ -6045,7 +6598,7 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                            imageVector = Icons.Filled.CheckCircle,
                             contentDescription = "Voltooid",
                             tint = StatusSuccess,
                             modifier = Modifier.size(48.dp)
@@ -6222,7 +6775,7 @@ fun DashboardHeroCard(settings: HeadphoneSettings, isCharging: Boolean) {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.GraphicEq,
+                                imageVector = Icons.Filled.GraphicEq,
                                 contentDescription = "ANC",
                                 tint = AccentPrimary,
                                 modifier = Modifier.size(12.dp)
@@ -6263,7 +6816,7 @@ fun DashboardHeroCard(settings: HeadphoneSettings, isCharging: Boolean) {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.HighQuality,
+                                imageVector = Icons.Filled.HighQuality,
                                 contentDescription = "Codec",
                                 tint = HighlightSky,
                                 modifier = Modifier.size(12.dp)
@@ -6407,7 +6960,7 @@ fun DashboardMediaWidget(viewModel: HeadphoneViewModel, settings: HeadphoneSetti
                         onClick = { viewModel.seekMedia(0) },
                         modifier = Modifier.size(32.dp).testTag("media_prev_btn")
                     ) {
-                        Icon(imageVector = Icons.Default.SkipPrevious, contentDescription = "Vorig nummer", tint = TextPrimary)
+                        Icon(imageVector = Icons.Filled.SkipPrevious, contentDescription = "Vorig nummer", tint = TextPrimary)
                     }
                     
                     IconButton(
@@ -6418,7 +6971,7 @@ fun DashboardMediaWidget(viewModel: HeadphoneViewModel, settings: HeadphoneSetti
                             .testTag("media_play_btn")
                     ) {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) "Pauzeren" else "Afspelen",
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
@@ -6429,7 +6982,7 @@ fun DashboardMediaWidget(viewModel: HeadphoneViewModel, settings: HeadphoneSetti
                         onClick = { viewModel.playProceduralTone() },
                         modifier = Modifier.size(32.dp).testTag("media_next_btn")
                     ) {
-                        Icon(imageVector = Icons.Default.SkipNext, contentDescription = "Volgend nummer (Ruis)", tint = TextPrimary)
+                        Icon(imageVector = Icons.Filled.SkipNext, contentDescription = "Volgend nummer (Ruis)", tint = TextPrimary)
                     }
                 }
             }
@@ -6493,7 +7046,7 @@ fun DashboardMediaWidget(viewModel: HeadphoneViewModel, settings: HeadphoneSetti
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = if (settings.dynamicBassEnabled) Icons.Default.CheckCircle else Icons.Default.Hearing,
+                            imageVector = if (settings.dynamicBassEnabled) Icons.Filled.CheckCircle else Icons.Filled.Hearing,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp)
                         )
@@ -6524,7 +7077,7 @@ fun DashboardMediaWidget(viewModel: HeadphoneViewModel, settings: HeadphoneSetti
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = if (settings.surroundSoundEnabled) Icons.Default.CheckCircle else Icons.Default.MusicNote,
+                            imageVector = if (settings.surroundSoundEnabled) Icons.Filled.CheckCircle else Icons.Filled.MusicNote,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp)
                         )
@@ -6538,6 +7091,7 @@ fun DashboardMediaWidget(viewModel: HeadphoneViewModel, settings: HeadphoneSetti
 
 @Composable
 fun DashboardQuickControls(viewModel: HeadphoneViewModel, settings: HeadphoneSettings) {
+    val haptic = LocalHapticFeedback.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -6560,14 +7114,17 @@ fun DashboardQuickControls(viewModel: HeadphoneViewModel, settings: HeadphoneSet
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     val ancModes = listOf(
-                        Triple("ON", "ANC Actief", Icons.Default.GraphicEq),
-                        Triple("TRANSPARENCY", "Omgevingsgeluid", Icons.Default.Hearing),
-                        Triple("OFF", "Uit", Icons.Default.Close)
+                        Triple("ON", "ANC Actief", Icons.Filled.GraphicEq),
+                        Triple("TRANSPARENCY", "Omgevingsgeluid", Icons.Filled.Hearing),
+                        Triple("OFF", "Uit", Icons.Filled.Close)
                     )
                     ancModes.forEach { (modeCode, label, icon) ->
                         val isSelected = settings.ancMode == modeCode
                         Button(
-                            onClick = { viewModel.setAncMode(modeCode) },
+                            onClick = { 
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setAncMode(modeCode) 
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(38.dp)
@@ -6613,7 +7170,10 @@ fun DashboardQuickControls(viewModel: HeadphoneViewModel, settings: HeadphoneSet
                     quickPresets.forEach { preset ->
                         val isSelected = settings.activePreset == preset
                         Button(
-                            onClick = { viewModel.setPreset(preset) },
+                            onClick = { 
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setPreset(preset) 
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(34.dp)
@@ -6849,7 +7409,7 @@ fun DashboardSoundSafetyMeter(viewModel: HeadphoneViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Hearing,
+                            imageVector = Icons.Filled.Hearing,
                             contentDescription = null,
                             tint = if (isRecordingNoise) AccentPrimary else HighlightSky,
                             modifier = Modifier.size(14.dp)
@@ -7101,7 +7661,7 @@ fun DashboardLocatorCard(viewModel: HeadphoneViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.LocationOn,
+                            imageVector = Icons.Filled.LocationOn,
                             contentDescription = null,
                             tint = StatusSuccess,
                             modifier = Modifier.size(18.dp)
@@ -7161,7 +7721,7 @@ fun DashboardLocatorCard(viewModel: HeadphoneViewModel) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = if (device.isHeadphone) Icons.Default.Headphones else Icons.Default.Bluetooth,
+                                    imageVector = if (device.isHeadphone) Icons.Filled.Headphones else Icons.Filled.Bluetooth,
                                     contentDescription = null,
                                     tint = if (device.isHeadphone) StatusSuccess else TextMuted,
                                     modifier = Modifier.size(12.dp)
@@ -7332,7 +7892,7 @@ fun BluetoothStatusIndicatorCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Bluetooth,
+                        imageVector = Icons.Filled.Bluetooth,
                         contentDescription = "Bluetooth Status",
                         tint = if (settings.connected) AccentPrimary else if (isAutoReconnecting) StatusPurple else TextMuted,
                         modifier = Modifier.size(18.dp)
@@ -7426,10 +7986,10 @@ fun BluetoothStatusIndicatorCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (settings.connected) Icons.Default.Bluetooth
-                                         else if (isAutoReconnecting) Icons.Default.Sync
-                                         else if (isConnecting) Icons.Default.Bluetooth
-                                         else Icons.Default.BluetoothDisabled,
+                            imageVector = if (settings.connected) Icons.Filled.Bluetooth
+                                         else if (isAutoReconnecting) Icons.Filled.Sync
+                                         else if (isConnecting) Icons.Filled.Bluetooth
+                                         else Icons.Filled.BluetoothDisabled,
                             contentDescription = null,
                             tint = if (settings.connected) StatusSuccess
                                    else if (isAutoReconnecting) StatusPurple
@@ -7485,7 +8045,7 @@ fun BluetoothStatusIndicatorCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.FlashOn,
+                            imageVector = Icons.Filled.FlashOn,
                             contentDescription = null,
                             tint = StatusSuccess,
                             modifier = Modifier.size(14.dp)
@@ -7509,7 +8069,7 @@ fun BluetoothStatusIndicatorCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Audiotrack,
+                            imageVector = Icons.Filled.Audiotrack,
                             contentDescription = null,
                             tint = HighlightSky,
                             modifier = Modifier.size(14.dp)
@@ -7533,7 +8093,7 @@ fun BluetoothStatusIndicatorCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Info,
+                            imageVector = Icons.Filled.Info,
                             contentDescription = null,
                             tint = StatusPurple,
                             modifier = Modifier.size(14.dp)
@@ -7677,7 +8237,7 @@ fun BluetoothStatusIndicatorCard(
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
-                                                imageVector = if (isThisDeviceHeadphone) Icons.Default.Headphones else Icons.Default.Bluetooth,
+                                                imageVector = if (isThisDeviceHeadphone) Icons.Filled.Headphones else Icons.Filled.Bluetooth,
                                                 contentDescription = null,
                                                 tint = if (isThisDeviceHeadphone) AccentPrimary else TextMuted,
                                                 modifier = Modifier.size(14.dp)
@@ -7814,7 +8374,7 @@ fun BluetoothStatusIndicatorCard(
                                 )
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.Bluetooth,
+                                    imageVector = Icons.Filled.Bluetooth,
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp)
                                 )
@@ -7865,7 +8425,7 @@ fun BluetoothStatusIndicatorCard(
                                 )
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.Search,
+                                    imageVector = Icons.Filled.Search,
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp)
                                 )
@@ -7926,7 +8486,7 @@ fun TechnicalConnectionStatsCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Analytics,
+                        imageVector = Icons.Filled.Analytics,
                         contentDescription = "Technische Verbindingsstatistieken",
                         tint = AccentPrimary,
                         modifier = Modifier.size(18.dp)
@@ -7987,7 +8547,7 @@ fun TechnicalConnectionStatsCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.BluetoothDisabled,
+                            imageVector = Icons.Filled.BluetoothDisabled,
                             contentDescription = "Verbroken",
                             tint = TextMuted,
                             modifier = Modifier.size(24.dp)
@@ -8029,7 +8589,7 @@ fun TechnicalConnectionStatsCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Info,
+                                imageVector = Icons.Filled.Info,
                                 contentDescription = "GATT Read",
                                 tint = AccentPrimary,
                                 modifier = Modifier.size(16.dp)
@@ -8083,7 +8643,7 @@ fun TechnicalConnectionStatsCard(
                                 )
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.CheckCircle,
+                                    imageVector = Icons.Filled.CheckCircle,
                                     contentDescription = "Success",
                                     tint = StatusSuccess,
                                     modifier = Modifier.size(12.dp)
@@ -8123,7 +8683,7 @@ fun TechnicalConnectionStatsCard(
                                 Text(text = "Uitlezen...", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.Sync,
+                                    imageVector = Icons.Filled.Sync,
                                     contentDescription = "GATT Read Button",
                                     modifier = Modifier.size(14.dp)
                                 )
@@ -8290,7 +8850,7 @@ fun TechnicalConnectionStatsCard(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.CheckCircle,
+                                            imageVector = Icons.Filled.CheckCircle,
                                             contentDescription = "Success",
                                             tint = StatusSuccess,
                                             modifier = Modifier.size(14.dp)
@@ -8324,7 +8884,7 @@ fun TechnicalConnectionStatsCard(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.CheckCircle,
+                                        imageVector = Icons.Filled.CheckCircle,
                                         contentDescription = "Success",
                                         tint = StatusSuccess,
                                         modifier = Modifier.size(12.dp)
@@ -8360,7 +8920,7 @@ fun TechnicalConnectionStatsCard(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Info,
+                                imageVector = Icons.Filled.Info,
                                 contentDescription = "Distance",
                                 tint = TextMuted,
                                 modifier = Modifier.size(12.dp)
@@ -8380,9 +8940,15 @@ fun TechnicalConnectionStatsCard(
                         )
                     }
                     
+                    val haptic = LocalHapticFeedback.current
                     Slider(
                         value = simulatedDistanceMeters,
-                        onValueChange = { viewModel.setSimulatedDistance(it) },
+                        onValueChange = { 
+                            if (it != simulatedDistanceMeters) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            viewModel.setSimulatedDistance(it) 
+                        },
                         valueRange = 0.5f..15.0f,
                         steps = 29, // 0.5m intervals
                         colors = SliderDefaults.colors(
@@ -8495,7 +9061,7 @@ fun TechnicalConnectionStatsCard(
                     ) {
                         // Stat Item: Audio Codec
                         TechnicalStatItem(
-                            icon = Icons.Default.Audiotrack,
+                            icon = Icons.Filled.Audiotrack,
                             iconColor = HighlightSky,
                             label = "Codec & Formaat",
                             value = activeAudioCodec,
@@ -8505,7 +9071,7 @@ fun TechnicalConnectionStatsCard(
                         // Stat Item: Audio Bitrate
                         val kbpsColor = if (bitrateKbps >= 660) HighlightSky else if (bitrateKbps >= 328) AccentPrimary else StatusYellow
                         TechnicalStatItem(
-                            icon = Icons.Default.Speed,
+                            icon = Icons.Filled.Speed,
                             iconColor = kbpsColor,
                             label = "Audio Bitrate",
                             value = if (bitrateKbps > 0) "$bitrateKbps kbps" else "N/A",
@@ -8528,7 +9094,7 @@ fun TechnicalConnectionStatsCard(
                         // Stat Item: Latency
                         val latencyColor = if (latencyMs < 60) StatusSuccess else if (latencyMs < 120) StatusYellow else StatusOrange
                         TechnicalStatItem(
-                            icon = Icons.Default.AccessTime,
+                            icon = Icons.Filled.AccessTime,
                             iconColor = latencyColor,
                             label = "Audio Vertraging",
                             value = if (latencyMs > 0) "$latencyMs ms" else "N/A",
@@ -8542,7 +9108,7 @@ fun TechnicalConnectionStatsCard(
                         // Stat Item: Packet Loss
                         val lossColor = if (packetLoss <= 0.01f) StatusSuccess else if (packetLoss <= 0.1f) StatusYellow else StatusDanger
                         TechnicalStatItem(
-                            icon = Icons.Default.SwapVert,
+                            icon = Icons.Filled.SwapVert,
                             iconColor = lossColor,
                             label = "Pakketverlies",
                             value = "%.2f%%".format(packetLoss * 100f),
@@ -8565,7 +9131,7 @@ fun TechnicalConnectionStatsCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Info,
+                        imageVector = Icons.Filled.Info,
                         contentDescription = "Protocol info",
                         tint = AccentPrimary,
                         modifier = Modifier.size(12.dp)
@@ -8590,7 +9156,7 @@ fun TechnicalConnectionStatsCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.BatteryAlert,
+                            imageVector = Icons.Filled.BatteryAlert,
                             contentDescription = "Warning",
                             tint = StatusDanger,
                             modifier = Modifier.size(12.dp)
@@ -8700,7 +9266,7 @@ fun DashboardSmartZonesCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.LocationOn,
+                        imageVector = Icons.Filled.LocationOn,
                         contentDescription = "Slimme Geluidsregeling",
                         tint = AccentPrimary,
                         modifier = Modifier.size(18.dp)
@@ -8752,7 +9318,7 @@ fun DashboardSmartZonesCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                            imageVector = Icons.Filled.CheckCircle,
                             contentDescription = "Succes",
                             tint = StatusSuccess,
                             modifier = Modifier.size(16.dp)
@@ -8853,10 +9419,10 @@ fun DashboardSmartZonesCard(
                     )
 
                     val zones = listOf(
-                        Triple("Thuis", "ANC Uit · Dynamic Bass", Icons.Default.Home),
-                        Triple("Kantoor", "Omgevingsgeluid · Vocal Clarity", Icons.Default.Laptop),
-                        Triple("Sportschool", "ANC Aan · Dynamic Bass", Icons.Default.FlashOn),
-                        Triple("Trein", "ANC Aan · Philips Signature", Icons.Default.SwapVert)
+                        Triple("Thuis", "ANC Uit · Dynamic Bass", Icons.Filled.Home),
+                        Triple("Kantoor", "Omgevingsgeluid · Vocal Clarity", Icons.Filled.Laptop),
+                        Triple("Sportschool", "ANC Aan · Dynamic Bass", Icons.Filled.FlashOn),
+                        Triple("Trein", "ANC Aan · Philips Signature", Icons.Filled.SwapVert)
                     )
 
                     zones.forEach { (name, desc, icon) ->
@@ -8933,7 +9499,7 @@ fun DashboardSmartZonesCard(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Info,
+                                        imageVector = Icons.Filled.Info,
                                         contentDescription = null,
                                         tint = HighlightSky,
                                         modifier = Modifier.size(14.dp)
@@ -9024,10 +9590,10 @@ fun DashboardSmartZonesCard(
                     )
 
                     val activities = listOf(
-                        Triple("Zitten", "ANC Aan · Harman EQ (Focus)", Icons.Default.Person),
-                        Triple("Wandelen", "Omgevingsgeluid · Philips EQ", Icons.Default.SwapVert),
-                        Triple("Hardlopen", "Omgevingsgeluid (Extra Veiligheid) · Bass EQ", Icons.Default.FlashOn),
-                        Triple("Reizen", "ANC Aan · Bass EQ (Blokkeer lawaai)", Icons.Default.LocationOn)
+                        Triple("Zitten", "ANC Aan · Harman EQ (Focus)", Icons.Filled.Person),
+                        Triple("Wandelen", "Omgevingsgeluid · Philips EQ", Icons.Filled.SwapVert),
+                        Triple("Hardlopen", "Omgevingsgeluid (Extra Veiligheid) · Bass EQ", Icons.Filled.FlashOn),
+                        Triple("Reizen", "ANC Aan · Bass EQ (Blokkeer lawaai)", Icons.Filled.LocationOn)
                     )
 
                     activities.forEach { (name, desc, icon) ->
@@ -9104,7 +9670,7 @@ fun DashboardSmartZonesCard(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Info,
+                                        imageVector = Icons.Filled.Info,
                                         contentDescription = null,
                                         tint = StatusPurple,
                                         modifier = Modifier.size(14.dp)
@@ -9288,7 +9854,7 @@ fun ActiveDeviceLinkPulseCard(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Link,
+                                imageVector = Icons.Filled.Link,
                                 contentDescription = "Active Link",
                                 tint = StatusSuccess,
                                 modifier = Modifier.size(14.dp)
@@ -9347,7 +9913,7 @@ fun ActiveDeviceLinkPulseCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Headphones,
+                            imageVector = Icons.Filled.Headphones,
                             contentDescription = null,
                             tint = StatusSuccess,
                             modifier = Modifier.size(26.dp)
@@ -9429,7 +9995,7 @@ fun ActiveDeviceLinkPulseCard(
                                 )
                                 if (isCharging) {
                                     Icon(
-                                        imageVector = Icons.Default.FlashOn,
+                                        imageVector = Icons.Filled.FlashOn,
                                         contentDescription = "Opladen",
                                         tint = StatusSuccess,
                                         modifier = Modifier.size(10.dp)
@@ -9477,7 +10043,7 @@ fun ActiveDeviceLinkPulseCard(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Speed,
+                                    imageVector = Icons.Filled.Speed,
                                     contentDescription = null,
                                     tint = HighlightSky,
                                     modifier = Modifier.size(14.dp)
@@ -9595,7 +10161,7 @@ fun PairingGuideDialog(onDismiss: () -> Unit) {
                         modifier = Modifier.testTag("btn_close_pairing_guide")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Close,
+                            imageVector = Icons.Filled.Close,
                             contentDescription = "Sluiten",
                             tint = TextMuted,
                             modifier = Modifier.size(20.dp)
@@ -10317,9 +10883,9 @@ fun Tah6519HeadphoneBatteryArt(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 val batteryIcon = when {
-                    isCharging -> Icons.Default.FlashOn
-                    batteryLevel <= 20 -> Icons.Default.BatteryAlert
-                    else -> Icons.Default.BatteryFull
+                    isCharging -> Icons.Filled.FlashOn
+                    batteryLevel <= 20 -> Icons.Filled.BatteryAlert
+                    else -> Icons.Filled.BatteryFull
                 }
                 Icon(
                     imageVector = batteryIcon,
@@ -10565,7 +11131,7 @@ fun PhilipsPremiumBatteryIndicator(
             ) {
                 if (isCharging) {
                     Icon(
-                        imageVector = Icons.Default.FlashOn,
+                        imageVector = Icons.Filled.FlashOn,
                         contentDescription = "Opladen",
                         tint = HighlightSky,
                         modifier = Modifier
@@ -10574,7 +11140,7 @@ fun PhilipsPremiumBatteryIndicator(
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Default.Headset,
+                        imageVector = Icons.Filled.Headset,
                         contentDescription = null,
                         tint = TextMuted.copy(alpha = 0.6f),
                         modifier = Modifier.size(16.dp)
@@ -10668,7 +11234,7 @@ fun PhilipsHeadphoneProgressBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Headset,
+                    imageVector = Icons.Filled.Headset,
                     contentDescription = null,
                     tint = AccentPrimary,
                     modifier = Modifier.size(18.dp)
@@ -10687,7 +11253,7 @@ fun PhilipsHeadphoneProgressBar(
             ) {
                 if (isCharging) {
                     Icon(
-                        imageVector = Icons.Default.FlashOn,
+                        imageVector = Icons.Filled.FlashOn,
                         contentDescription = "Opladen",
                         tint = HighlightSky,
                         modifier = Modifier
@@ -10908,7 +11474,7 @@ fun SettingsDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Warning,
+                            imageVector = Icons.Filled.Warning,
                             contentDescription = null,
                             tint = StatusDanger,
                             modifier = Modifier.size(32.dp)
@@ -10998,7 +11564,7 @@ fun SettingsDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
+                            imageVector = Icons.Filled.Settings,
                             contentDescription = null,
                             tint = HighlightSky,
                             modifier = Modifier.size(20.dp)
@@ -11011,7 +11577,7 @@ fun SettingsDialog(
                         )
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Sluit", tint = TextMuted)
+                        Icon(imageVector = Icons.Filled.Close, contentDescription = "Sluit", tint = TextMuted)
                     }
                 }
 
@@ -11038,7 +11604,7 @@ fun SettingsDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Headphones,
+                                imageVector = Icons.Filled.Headphones,
                                 contentDescription = null,
                                 tint = AccentPrimary,
                                 modifier = Modifier.size(22.dp)
@@ -11089,7 +11655,7 @@ fun SettingsDialog(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Info,
+                                    imageVector = Icons.Filled.Info,
                                     contentDescription = null,
                                     tint = HighlightSky,
                                     modifier = Modifier.size(14.dp)
@@ -11102,7 +11668,7 @@ fun SettingsDialog(
                                 )
                             }
                             Icon(
-                                imageVector = if (showSpecs) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                imageVector = if (showSpecs) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                                 contentDescription = if (showSpecs) "Minder details" else "Meer details",
                                 tint = TextMuted,
                                 modifier = Modifier.size(16.dp)
@@ -11183,7 +11749,7 @@ fun SettingsDialog(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (ThemeState.isLightMode) Icons.Default.WbSunny else Icons.Default.NightsStay,
+                                    imageVector = if (ThemeState.isLightMode) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
                                     contentDescription = null,
                                     tint = HighlightSky,
                                     modifier = Modifier.size(14.dp)
@@ -11311,7 +11877,7 @@ fun SettingsDialog(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Info,
+                                    imageVector = Icons.Filled.Info,
                                     contentDescription = null,
                                     tint = HighlightSky,
                                     modifier = Modifier.size(14.dp)
@@ -11349,7 +11915,7 @@ fun SettingsDialog(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Fingerprint,
+                                    imageVector = Icons.Filled.Fingerprint,
                                     contentDescription = null,
                                     tint = HighlightSky,
                                     modifier = Modifier.size(14.dp)
@@ -11444,7 +12010,7 @@ fun SettingsDialog(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.DeleteForever,
+                            imageVector = Icons.Filled.DeleteForever,
                             contentDescription = null,
                             tint = StatusDanger,
                             modifier = Modifier.size(16.dp)
@@ -11561,7 +12127,7 @@ fun FirmwareUpdatePromptDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.SystemUpdate,
+                        imageVector = Icons.Filled.SystemUpdate,
                         contentDescription = null,
                         tint = HighlightSky,
                         modifier = Modifier.size(32.dp)

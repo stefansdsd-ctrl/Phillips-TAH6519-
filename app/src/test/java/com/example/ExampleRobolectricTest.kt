@@ -21,7 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class ExampleRobolectricTest {
 
     private lateinit var dao: FakeHeadphoneDao
@@ -160,22 +160,17 @@ class ExampleRobolectricTest {
 
     @Test
     fun testThemeToggling() {
-        // Set initial state to Dark Mode
-        com.example.ui.theme.ThemeState.isLightMode = false
-        assertFalse(com.example.ui.theme.ThemeState.isLightMode)
-        com.example.ui.theme.ThemeState.darkBg = androidx.compose.ui.graphics.Color(0xFF090D1A)
-        assertEquals(androidx.compose.ui.graphics.Color(0xFF090D1A), com.example.ui.theme.DarkBg)
+        // Set initial state to PHILIPS_STUDIO
+        com.example.ui.theme.ThemeState.activeTheme = com.example.ui.theme.AppTheme.PHILIPS_STUDIO
+        assertEquals(com.example.ui.theme.AppTheme.PHILIPS_STUDIO, com.example.ui.theme.ThemeState.activeTheme)
 
-        // Toggle to Philips Blue Light Mode
-        com.example.ui.theme.ThemeState.isLightMode = true
-        assertTrue(com.example.ui.theme.ThemeState.isLightMode)
-        com.example.ui.theme.ThemeState.darkBg = androidx.compose.ui.graphics.Color(0xFFF0F4FC)
-        assertEquals(androidx.compose.ui.graphics.Color(0xFFF0F4FC), com.example.ui.theme.DarkBg)
+        // Toggle to CYBERPUNK_NEON
+        com.example.ui.theme.ThemeState.activeTheme = com.example.ui.theme.AppTheme.CYBERPUNK_NEON
+        assertEquals(com.example.ui.theme.AppTheme.CYBERPUNK_NEON, com.example.ui.theme.ThemeState.activeTheme)
 
-        // Toggle back to Dark Mode
-        com.example.ui.theme.ThemeState.isLightMode = false
-        assertFalse(com.example.ui.theme.ThemeState.isLightMode)
-        com.example.ui.theme.ThemeState.darkBg = androidx.compose.ui.graphics.Color(0xFF090D1A)
+        // Toggle to HIGH_CONTRAST
+        com.example.ui.theme.ThemeState.activeTheme = com.example.ui.theme.AppTheme.HIGH_CONTRAST
+        assertEquals(com.example.ui.theme.AppTheme.HIGH_CONTRAST, com.example.ui.theme.ThemeState.activeTheme)
     }
 
     @Test
@@ -192,6 +187,11 @@ class ExampleRobolectricTest {
 
     @Test
     fun testAutoPowerOffAndFastForward() = runBlocking {
+        // Make sure settings shows connected is true first
+        viewModel.toggleSimulationMode(true)
+        val connSettings = viewModel.settingsState.first { it.connected }
+        assertTrue(connSettings.connected)
+
         // Toggle Auto Power Off
         viewModel.toggleAutoPowerOff(true)
         var settings = viewModel.settingsState.first { it.autoPowerOffEnabled }
@@ -203,16 +203,14 @@ class ExampleRobolectricTest {
         assertEquals(15, settings.autoPowerOffMinutes)
 
         // Since we are connected but not playing media and not wearing headphones initially,
-        // it starts as inactive. Let's toggle wearing detection or make sure we can trigger fast forward.
+        // it starts as inactive. Let's toggle wearing state.
         viewModel.toggleWearingState(false)
         assertFalse(viewModel.isWearingHeadphones.value)
 
-        // Make sure settings shows connected is true
-        viewModel.toggleSimulationMode(true)
-        assertTrue(viewModel.settingsState.value.connected)
-
         // Wait a small moment for background loop to run and initialize the timer
         delay(1200)
+        val remainingSec = viewModel.autoOffRemainingSeconds.value
+        assertTrue(remainingSec > 0)
 
         // Trigger fast forward
         viewModel.fastForwardAutoOff()

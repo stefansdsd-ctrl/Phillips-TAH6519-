@@ -49,7 +49,13 @@ data class HeadphoneSettings(
     val touchHoldAction: String = "ANC Wisselen",
     
     // Battery Health
-    val batteryHealthEnabled: Boolean = false
+    val batteryHealthEnabled: Boolean = false,
+
+    // Advanced Sound quality features
+    val spatialAudioMode: String = "Stereo", // "Stereo", "Live Concert", "Cinematic 3D", "Acoustic Studio"
+    val dynamicBassLevel: Int = 1, // 0 = Off, 1 = Low (Warm), 2 = Medium (Punchy), 3 = High (Thunder)
+    val ldacQualityMode: String = "Balanced", // "Optimized (990kbps)", "Balanced (660kbps)", "Best Effort (330kbps)"
+    val ancCompensationEnabled: Boolean = true // Auto-correct sub-bass loss when ANC level is high
 ) {
     fun getBands(): List<Float> {
         return listOf(
