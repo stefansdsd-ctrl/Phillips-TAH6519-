@@ -44,6 +44,22 @@ data class ScannedDevice(
     val isHeadphone: Boolean
 )
 
+data class CompatibleBluetoothDevice(
+    val brand: String,
+    val name: String,
+    val address: String,
+    val category: String,
+    val driverSizeMm: Int,
+    val supportedCodecs: List<String>,
+    val maxPlaytimeHours: Int,
+    val ancPlaytimeHours: Int,
+    val ancSupported: Boolean,
+    val bluetoothVersion: String,
+    val rssi: Int = -45,
+    val fastPairSupported: Boolean = true,
+    val isPhilips: Boolean = false
+)
+
 class HeadphoneViewModel(application: Application, private val repository: HeadphoneRepository) : ViewModel() {
     private val _settingsState = MutableStateFlow(HeadphoneSettings())
     val settingsState: StateFlow<HeadphoneSettings> = _settingsState.asStateFlow()
@@ -68,6 +84,8 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     val isCharging = MutableStateFlow(false)
     val isConnecting = MutableStateFlow(false)
     val isFetchingBattery = MutableStateFlow(false)
+    val isFindMyBeeping = MutableStateFlow(false)
+    val findMySignalStatus = MutableStateFlow("Gereed voor opsporen")
     val isGattReading = MutableStateFlow(false)
     val isRecordingNoise = MutableStateFlow(false)
     val isScanningBluetooth = MutableStateFlow(false)
@@ -116,22 +134,247 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         YouTubeTrack("9bZkp7q19f0", "PSY - GANGNAM STYLE", "Official PSY", 252, true)
     ))
 
+    val compatibleBluetoothDevices = MutableStateFlow(listOf(
+        CompatibleBluetoothDevice(
+            brand = "Philips",
+            name = "Philips TAH6519",
+            address = "00:11:22:33:44:55",
+            category = "Over-Ear Wireless",
+            driverSizeMm = 40,
+            supportedCodecs = listOf("LDAC", "AAC", "SBC"),
+            maxPlaytimeHours = 80,
+            ancPlaytimeHours = 40,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.3",
+            rssi = -38,
+            fastPairSupported = true,
+            isPhilips = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Philips",
+            name = "Philips TAH8506",
+            address = "00:11:22:33:44:88",
+            category = "Over-Ear Premium",
+            driverSizeMm = 40,
+            supportedCodecs = listOf("AAC", "SBC"),
+            maxPlaytimeHours = 60,
+            ancPlaytimeHours = 35,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.2",
+            rssi = -42,
+            fastPairSupported = true,
+            isPhilips = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Philips",
+            name = "Philips Fidelio L3",
+            address = "00:11:22:33:55:99",
+            category = "Audiophile Wireless",
+            driverSizeMm = 40,
+            supportedCodecs = listOf("LDAC", "aptX HD", "AAC"),
+            maxPlaytimeHours = 38,
+            ancPlaytimeHours = 30,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.2",
+            rssi = -40,
+            fastPairSupported = true,
+            isPhilips = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Sony",
+            name = "Sony WH-1000XM5",
+            address = "44:55:66:77:88:99",
+            category = "Over-Ear ANC",
+            driverSizeMm = 30,
+            supportedCodecs = listOf("LDAC", "AAC", "SBC"),
+            maxPlaytimeHours = 40,
+            ancPlaytimeHours = 30,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.3",
+            rssi = -48,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Sony",
+            name = "Sony WF-1000XM5",
+            address = "44:55:66:AA:BB:CC",
+            category = "In-Ear / Earbuds",
+            driverSizeMm = 8,
+            supportedCodecs = listOf("LDAC", "AAC", "LC3"),
+            maxPlaytimeHours = 24,
+            ancPlaytimeHours = 12,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.3",
+            rssi = -55,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Bose",
+            name = "Bose QuietComfort Ultra",
+            address = "A1:B2:C3:D4:E5:F6",
+            category = "Over-Ear ANC",
+            driverSizeMm = 35,
+            supportedCodecs = listOf("aptX Adaptive", "AAC", "SBC"),
+            maxPlaytimeHours = 30,
+            ancPlaytimeHours = 24,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.3",
+            rssi = -52,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Apple",
+            name = "Apple AirPods Max",
+            address = "12:34:56:78:90:AB",
+            category = "Over-Ear Premium",
+            driverSizeMm = 40,
+            supportedCodecs = listOf("AAC", "Spatial Audio"),
+            maxPlaytimeHours = 20,
+            ancPlaytimeHours = 20,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.0",
+            rssi = -58,
+            fastPairSupported = false
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Sennheiser",
+            name = "Sennheiser Momentum 4",
+            address = "98:76:54:32:10:FE",
+            category = "Over-Ear Wireless",
+            driverSizeMm = 42,
+            supportedCodecs = listOf("aptX Adaptive", "aptX HD", "AAC"),
+            maxPlaytimeHours = 60,
+            ancPlaytimeHours = 60,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.2",
+            rssi = -61,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "JBL",
+            name = "JBL Live 660NC",
+            address = "22:33:44:55:66:77",
+            category = "Over-Ear Wireless",
+            driverSizeMm = 40,
+            supportedCodecs = listOf("AAC", "SBC"),
+            maxPlaytimeHours = 65,
+            ancPlaytimeHours = 50,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.0",
+            rssi = -65,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Soundcore",
+            name = "Anker Soundcore Space Q45",
+            address = "33:44:55:66:77:88",
+            category = "Over-Ear ANC",
+            driverSizeMm = 40,
+            supportedCodecs = listOf("LDAC", "AAC", "SBC"),
+            maxPlaytimeHours = 65,
+            ancPlaytimeHours = 50,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.3",
+            rssi = -69,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Samsung",
+            name = "Samsung Galaxy Buds2 Pro",
+            address = "55:66:77:88:99:AA",
+            category = "In-Ear / Earbuds",
+            driverSizeMm = 10,
+            supportedCodecs = listOf("SSC 24-bit", "AAC", "SBC"),
+            maxPlaytimeHours = 29,
+            ancPlaytimeHours = 18,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.3",
+            rssi = -73,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Shure",
+            name = "Shure AONIC 50 Gen 2",
+            address = "66:77:88:99:AA:BB",
+            category = "Studio Audiophile",
+            driverSizeMm = 50,
+            supportedCodecs = listOf("LDAC", "aptX HD", "aptX Adaptive", "AAC"),
+            maxPlaytimeHours = 45,
+            ancPlaytimeHours = 35,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.2",
+            rssi = -50,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Audio-Technica",
+            name = "Audio-Technica ATH-M50xBT2",
+            address = "77:88:99:AA:BB:CC",
+            category = "Studio Reference",
+            driverSizeMm = 45,
+            supportedCodecs = listOf("LDAC", "AAC", "SBC"),
+            maxPlaytimeHours = 50,
+            ancPlaytimeHours = 50,
+            ancSupported = false,
+            bluetoothVersion = "Bluetooth 5.0",
+            rssi = -54,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Bowers & Wilkins",
+            name = "Bowers & Wilkins PX8",
+            address = "88:99:AA:BB:CC:DD",
+            category = "Audiophile Premium",
+            driverSizeMm = 40,
+            supportedCodecs = listOf("aptX Lossless", "aptX Adaptive", "AAC"),
+            maxPlaytimeHours = 30,
+            ancPlaytimeHours = 30,
+            ancSupported = true,
+            bluetoothVersion = "Bluetooth 5.2",
+            rssi = -46,
+            fastPairSupported = true
+        ),
+        CompatibleBluetoothDevice(
+            brand = "Wired Line-In",
+            name = "Wired Studio Headphones (3.5mm)",
+            address = "WIRED_LINE_IN",
+            category = "Wired 3.5mm / USB-C",
+            driverSizeMm = 45,
+            supportedCodecs = listOf("Hi-Res PCM 24-bit/96kHz"),
+            maxPlaytimeHours = 999,
+            ancPlaytimeHours = 999,
+            ancSupported = false,
+            bluetoothVersion = "Direct Cable Line-In",
+            rssi = -20,
+            fastPairSupported = false
+        )
+    ))
+
     val scannedDevices = MutableStateFlow(listOf(
-        ScannedDevice("Philips TAH6519", "00:11:22:33:44:55", -45, true),
-        ScannedDevice("Stefan's Pixel 8", "AA:BB:CC:DD:EE:FF", -78, false),
-        ScannedDevice("Office Smart TV", "11:22:33:44:55:66", -92, false),
-        ScannedDevice("Unknown BLE Beacon", "FE:DC:BA:98:76:54", -88, false)
+        ScannedDevice("Philips TAH6519", "00:11:22:33:44:55", -42, true),
+        ScannedDevice("Sony WH-1000XM5", "44:55:66:77:88:99", -48, true),
+        ScannedDevice("Bose QuietComfort Ultra", "A1:B2:C3:D4:E5:F6", -52, true),
+        ScannedDevice("Apple AirPods Max", "12:34:56:78:90:AB", -58, true),
+        ScannedDevice("Sennheiser Momentum 4", "98:76:54:32:10:FE", -61, true),
+        ScannedDevice("JBL Live 660NC", "22:33:44:55:66:77", -65, true),
+        ScannedDevice("Anker Soundcore Q45", "33:44:55:66:77:88", -69, true),
+        ScannedDevice("Samsung Galaxy Buds2 Pro", "55:66:77:88:99:AA", -73, true),
+        ScannedDevice("Wired Studio Headphones (3.5mm)", "WIRED_LINE_IN", -25, true),
+        ScannedDevice("Stefan's Pixel 8", "AA:BB:CC:DD:EE:FF", -82, false),
+        ScannedDevice("Office Smart TV", "11:22:33:44:55:66", -92, false)
     ))
 
     val defaultPresets = mapOf(
-        "Flat" to listOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f),
-        "Balanced" to listOf(1f, 1f, 0.5f, 0f, 0f, 0.5f, 1f, 1.5f, 1.5f, 1f),
-        "Bass Boost" to listOf(8f, 6f, 4f, 2f, 0f, 0f, 0f, 0f, 0f, 0f),
-        "Voice Clarity" to listOf(-2f, -1f, 1f, 3f, 5f, 5f, 4f, 2f, -1f, -2f),
-        "Treble Boost" to listOf(0f, 0f, 0f, 0f, 1f, 2f, 4f, 6f, 8f, 6f),
-        "Vocal Boost" to listOf(-2f, -1f, 1f, 3f, 4f, 4f, 3f, 1f, -1f, -2f),
+        "Philips Signature" to listOf(3.5f, 2.5f, 1.0f, 0.0f, -0.5f, 0.5f, 1.5f, 2.5f, 3.5f, 2.5f),
+        "Bass Boost" to listOf(8.5f, 7.0f, 5.0f, 2.5f, 0.0f, -0.5f, 0.0f, 0.5f, 1.0f, 0.5f),
+        "Acoustic" to listOf(1.5f, 2.0f, 2.5f, 1.5f, 0.5f, 1.0f, 2.0f, 3.0f, 3.5f, 2.0f),
+        "Voice Clarity" to listOf(-3.0f, -2.0f, 0.0f, 2.5f, 5.0f, 5.5f, 4.0f, 2.0f, -1.0f, -2.0f),
+        "Treble Sparkle" to listOf(-1.0f, -0.5f, 0.0f, 0.5f, 1.5f, 2.5f, 4.5f, 6.5f, 8.0f, 6.5f),
+        "Cinema 3D" to listOf(6.0f, 4.5f, 2.0f, 0.0f, -1.0f, 1.0f, 3.0f, 4.0f, 4.5f, 3.5f),
+        "Dynamic Bass" to listOf(7.0f, 5.5f, 3.5f, 1.5f, 0.0f, 0.0f, 0.5f, 1.0f, 1.5f, 1.0f),
+        "Balanced" to listOf(1.0f, 1.0f, 0.5f, 0.0f, 0.0f, 0.5f, 1.0f, 1.5f, 1.5f, 1.0f),
         "Pop" to listOf(3.0f, 2.0f, 0.5f, -1.0f, -1.5f, -1.0f, 0.5f, 1.5f, 2.5f, 3.0f),
-        "Philips Signature" to listOf(3f, 2f, 1f, 0f, -1f, 0f, 1f, 2f, 3f, 2f)
+        "Flat" to listOf(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
     )
     val presets: Map<String, List<Float>> = defaultPresets
 
@@ -139,13 +382,46 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         viewModelScope.launch {
             repository.settingsFlow.collect { settings ->
                 _settingsState.value = settings
+                autoReconnectEnabled.value = settings.autoReconnectOnLaunch
             }
         }
         
-        // Background loop for media progress, sleep timer, and auto off timer
+        // Auto-reconnect on app launch for last paired device
         viewModelScope.launch {
+            delay(800)
+            val currentSettings = _settingsState.value
+            if (currentSettings.autoReconnectOnLaunch && !currentSettings.connected) {
+                triggerLaunchAutoReconnect()
+            }
+        }
+        
+        // Background loop for media progress, sleep timer, auto off, and REAL-TIME BATTERY DRAIN/CHARGE
+        viewModelScope.launch {
+            var batteryTickCounter = 0
             while (true) {
                 delay(1000)
+                batteryTickCounter++
+                
+                // Real-time dynamic battery simulation & tracking
+                val currentSettings = _settingsState.value
+                if (isCharging.value) {
+                    if (batteryTickCounter % 3 == 0) { // Charge 1% every 3 seconds
+                        if (currentSettings.batteryLevel < 100) {
+                            updateBatteryLevel(currentSettings.batteryLevel + 1)
+                        }
+                    }
+                } else if (currentSettings.connected) {
+                    val drainInterval = if (mediaIsPlaying.value) {
+                        if (currentSettings.ancMode == "ON") 25 else 40 // Drain faster when playing with ANC
+                    } else {
+                        90 // Slow idle discharge
+                    }
+                    if (batteryTickCounter % drainInterval == 0) {
+                        if (currentSettings.batteryLevel > 0) {
+                            updateBatteryLevel(currentSettings.batteryLevel - 1)
+                        }
+                    }
+                }
                 
                 // Sleep Timer
                 if (sleepTimerRunning.value) {
@@ -172,7 +448,6 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                 }
                 
                 // Auto Off Timer
-                val currentSettings = _settingsState.value
                 if (currentSettings.connected && currentSettings.autoPowerOffEnabled) {
                     if (!isWearingHeadphones.value && !mediaIsPlaying.value) {
                         val rem = autoOffRemainingSeconds.value
@@ -189,7 +464,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         }
     }
 
-    private fun updateSettings(update: (HeadphoneSettings) -> HeadphoneSettings) {
+    fun updateSettings(update: (HeadphoneSettings) -> HeadphoneSettings) {
         val updated = update(_settingsState.value)
         _settingsState.value = updated
         viewModelScope.launch {
@@ -240,6 +515,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     fun setYoutubeActive(active: Boolean) {
         isYoutubeActive.value = active
         currentTrackIndex.value = 0
+        mediaIsPlaying.value = true
         syncActiveTrackMetadata()
     }
 
@@ -264,66 +540,193 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     }
 
     fun importYoutubePlaylist(url: String) {
-        val finalUrl = if (url.isBlank()) lastYoutubePlaylistUrl.value else url
+        val rawInput = if (url.isBlank()) lastYoutubePlaylistUrl.value else url.trim()
         viewModelScope.launch {
             isYoutubeImporting.value = true
-            youtubeImportMessage.value = "Bezig met verbinding maken..."
-            lastYoutubePlaylistUrl.value = finalUrl
-            
-            // Extract playlist ID
-            var listId = ""
-            if (finalUrl.contains("list=")) {
-                val idx = finalUrl.indexOf("list=")
-                val start = idx + 5
-                var end = finalUrl.indexOf("&", start)
-                if (end == -1) end = finalUrl.length
-                listId = finalUrl.substring(start, end)
-            } else if (finalUrl.isNotBlank()) {
-                listId = finalUrl.trim()
-            }
-            
-            val apiKey = try {
-                BuildConfig.YOUTUBE_API_KEY
-            } catch (e: Exception) {
-                ""
-            }
-            
-            if (apiKey.isNotBlank() && apiKey != "MY_YOUTUBE_API_KEY" && listId.isNotBlank()) {
-                try {
-                    youtubeImportMessage.value = "Gegevens ophalen via YouTube API..."
-                    val api = YouTubeApi.create()
-                    val response = api.getPlaylistItems(playlistId = listId, apiKey = apiKey)
-                    val items = response.items
-                    if (items != null && items.isNotEmpty()) {
-                        val tracks = items.map { item ->
-                            val snippet = item.snippet
-                            val vId = snippet?.resourceId?.videoId ?: ""
-                            val title = snippet?.title ?: "Onbekend Nummer"
-                            val artist = snippet?.videoOwnerChannelTitle ?: "YouTube Artiest"
-                            YouTubeTrack(
-                                youtubeId = vId,
-                                title = title,
-                                artist = artist,
-                                durationSecs = (180..300).random(), // snippet has no duration, pick random realistic
-                                isOffline = (0..1).random() == 1
-                            )
-                        }
-                        youtubePlaylistTracks.value = tracks
-                        youtubePlaylistName.value = "Geïmporteerde Playlist ($listId)"
-                        val currentLocaleTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-                        youtubeLastSyncedTime.value = "Vandaag, $currentLocaleTime"
-                        youtubeImportMessage.value = "Succesvol geïmporteerd!"
-                    } else {
-                        youtubeImportMessage.value = "Geen nummers gevonden in deze playlist."
+            youtubeImportMessage.value = "Verbinding maken met YouTube database..."
+            lastYoutubePlaylistUrl.value = rawInput
+
+            val currentLocaleTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+            val apiKey = try { BuildConfig.YOUTUBE_API_KEY } catch (e: Exception) { "" }
+            val hasValidApiKey = apiKey.isNotBlank() && apiKey != "MY_YOUTUBE_API_KEY"
+
+            try {
+                // Check if rawInput contains a playlist ID or URL
+                val playlistId = when {
+                    rawInput.contains("PL_CHILL_LOFI_BEATS") -> "PLw-VjHDlEOgvWPror36E_A0X0Aofc7L0D"
+                    rawInput.contains("PL_WORKOUT_ENERGY_BEATS") -> "PL4fGSI1pDJn6O1LS0XSdF3RyO0Rq_LDeI"
+                    rawInput.contains("PL_POP_TOP_HITS") -> "PLDcnymzs18LU4K9s7468BvtMeih62sEVX"
+                    rawInput.contains("list=") -> {
+                        val idx = rawInput.indexOf("list=")
+                        val start = idx + 5
+                        var end = rawInput.indexOf("&", start)
+                        if (end == -1) end = rawInput.length
+                        rawInput.substring(start, end)
                     }
-                } catch (e: Exception) {
-                    youtubeImportMessage.value = "Fout bij ophalen: ${e.localizedMessage ?: "Verbindingsfout"}"
-                    loadFallbackPlaylist(finalUrl)
+                    rawInput.startsWith("PL") -> rawInput
+                    else -> ""
                 }
-            } else {
-                loadFallbackPlaylist(finalUrl)
+
+                // Check if rawInput is a single YouTube video URL or ID
+                val videoId = when {
+                    playlistId.isNotBlank() -> ""
+                    rawInput.contains("v=") -> {
+                        val idx = rawInput.indexOf("v=")
+                        val start = idx + 2
+                        var end = rawInput.indexOf("&", start)
+                        if (end == -1) end = rawInput.length
+                        rawInput.substring(start, end)
+                    }
+                    rawInput.contains("youtu.be/") -> {
+                        val idx = rawInput.indexOf("youtu.be/")
+                        val start = idx + 9
+                        var end = rawInput.indexOf("?", start)
+                        if (end == -1) end = rawInput.length
+                        rawInput.substring(start, end)
+                    }
+                    rawInput.length == 11 && !rawInput.contains(" ") -> rawInput
+                    else -> ""
+                }
+
+                if (playlistId.isNotBlank()) {
+                    youtubeImportMessage.value = "Playlist nummers ophalen uit YouTube database..."
+                    var fetchedTracks = emptyList<YouTubeTrack>()
+
+                    // 1. Try YouTube v3 API if API Key is configured
+                    if (hasValidApiKey) {
+                        try {
+                            val api = com.example.api.YouTubeApi.create()
+                            val response = api.getPlaylistItems(playlistId = playlistId, apiKey = apiKey)
+                            val items = response.items
+                            if (!items.isNullOrEmpty()) {
+                                fetchedTracks = items.map { item ->
+                                    val snippet = item.snippet
+                                    YouTubeTrack(
+                                        youtubeId = snippet?.resourceId?.videoId ?: "",
+                                        title = snippet?.title ?: "YouTube Track",
+                                        artist = snippet?.videoOwnerChannelTitle ?: snippet?.channelTitle ?: "YouTube Artist",
+                                        durationSecs = (180..300).random(),
+                                        isOffline = true
+                                    )
+                                }.filter { it.youtubeId.isNotBlank() }
+                            }
+                        } catch (e: Exception) {
+                            // Fallback to RSS if API fails
+                        }
+                    }
+
+                    // 2. Try YouTube Official RSS feed if no tracks fetched yet
+                    if (fetchedTracks.isEmpty()) {
+                        fetchedTracks = com.example.api.YouTubeRssFetcher.fetchPlaylistTracks(playlistId)
+                    }
+
+                    if (fetchedTracks.isNotEmpty()) {
+                        youtubePlaylistTracks.value = fetchedTracks
+                        youtubePlaylistName.value = "YouTube Playlist ($playlistId)"
+                        youtubeLastSyncedTime.value = "Vandaag, $currentLocaleTime"
+                        youtubeImportMessage.value = "Gesynchroniseerd met YouTube! (${fetchedTracks.size} nummers)"
+                    } else {
+                        loadFallbackPlaylist(rawInput)
+                    }
+
+                } else if (videoId.isNotBlank()) {
+                    youtubeImportMessage.value = "Video details ophalen via YouTube OEmbed..."
+                    var videoTitle = "YouTube Video"
+                    var videoAuthor = "YouTube Channel"
+
+                    try {
+                        val api = com.example.api.YouTubeApi.create()
+                        val oembed = api.getOEmbed(videoUrl = "https://www.youtube.com/watch?v=$videoId")
+                        if (!oembed.title.isNullOrBlank()) videoTitle = oembed.title
+                        if (!oembed.authorName.isNullOrBlank()) videoAuthor = oembed.authorName
+                    } catch (e: Exception) {
+                        // Keep defaults
+                    }
+
+                    val newTrack = YouTubeTrack(
+                        youtubeId = videoId,
+                        title = videoTitle,
+                        artist = videoAuthor,
+                        durationSecs = (180..300).random(),
+                        isOffline = true
+                    )
+
+                    val updatedList = listOf(newTrack) + youtubePlaylistTracks.value.filter { it.youtubeId != videoId }
+                    youtubePlaylistTracks.value = updatedList
+                    youtubePlaylistName.value = "Afgespeeld: $videoTitle"
+                    youtubeLastSyncedTime.value = "Vandaag, $currentLocaleTime"
+                    youtubeImportMessage.value = "Video toegevoegd uit YouTube database!"
+
+                } else if (rawInput.isNotBlank()) {
+                    // Search query logic
+                    youtubeImportMessage.value = "Zoeken op YouTube naar '$rawInput'..."
+                    var searchTracks = emptyList<YouTubeTrack>()
+
+                    if (hasValidApiKey) {
+                        try {
+                            val api = com.example.api.YouTubeApi.create()
+                            val searchResp = api.searchVideos(query = rawInput, apiKey = apiKey)
+                            val items = searchResp.items
+                            if (!items.isNullOrEmpty()) {
+                                searchTracks = items.mapNotNull { item ->
+                                    val snippet = item.snippet
+                                    val vId = item.id?.videoId ?: ""
+                                    if (vId.isNotBlank()) {
+                                        YouTubeTrack(
+                                            youtubeId = vId,
+                                            title = snippet?.title ?: rawInput,
+                                            artist = snippet?.channelTitle ?: "YouTube Music",
+                                            durationSecs = (180..300).random(),
+                                            isOffline = true
+                                        )
+                                    } else null
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Fallback
+                        }
+                    }
+
+                    if (searchTracks.isEmpty()) {
+                        try {
+                            val piped = com.example.api.PipedApi.create()
+                            val results = piped.searchMusic(query = rawInput)
+                            if (results.isNotEmpty()) {
+                                searchTracks = results.mapNotNull { item ->
+                                    val vId = item.url?.replace("/watch?v=", "") ?: ""
+                                    if (vId.isNotBlank()) {
+                                        YouTubeTrack(
+                                            youtubeId = vId,
+                                            title = item.title ?: rawInput,
+                                            artist = item.uploaderName ?: "YouTube Music",
+                                            durationSecs = item.duration ?: (180..300).random(),
+                                            isOffline = true
+                                        )
+                                    } else null
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Fallback
+                        }
+                    }
+
+                    if (searchTracks.isNotEmpty()) {
+                        youtubePlaylistTracks.value = searchTracks
+                        youtubePlaylistName.value = "Zoekresultaten: '$rawInput'"
+                        youtubeLastSyncedTime.value = "Vandaag, $currentLocaleTime"
+                        youtubeImportMessage.value = "YouTube doorzocht: ${searchTracks.size} resultaten"
+                    } else {
+                        loadFallbackPlaylist(rawInput)
+                    }
+                } else {
+                    loadFallbackPlaylist(rawInput)
+                }
+            } catch (e: Exception) {
+                youtubeImportMessage.value = "Fout bij synchroniseren: ${e.localizedMessage}"
+                loadFallbackPlaylist(rawInput)
+            } finally {
+                isYoutubeImporting.value = false
             }
-            isYoutubeImporting.value = false
         }
     }
 
@@ -465,17 +868,140 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         }
     }
 
+    fun selectHeadphoneProfile(deviceName: String, customCategory: String? = null) {
+        val name = deviceName.ifBlank { "Philips TAH6519" }
+        val lower = name.lowercase()
+
+        val category = customCategory ?: when {
+            lower.contains("earbud") || lower.contains("buds") || lower.contains("airpods pro") || lower.contains("wf-") || lower.contains("in-ear") -> "In-Ear / Earbuds"
+            lower.contains("on-ear") || lower.contains("tune") || lower.contains("major") -> "On-Ear Wireless"
+            lower.contains("wired") || lower.contains("3.5mm") || lower.contains("jack") || lower.contains("studio") || lower.contains("line_in") -> "Wired 3.5mm / USB-C"
+            lower.contains("gaming") || lower.contains("headset") || lower.contains("barracuda") -> "Gaming Headset"
+            else -> "Over-Ear Wireless"
+        }
+
+        val driverSize = when {
+            category.contains("In-Ear") -> 11
+            category.contains("On-Ear") -> 32
+            category.contains("Wired") -> 45
+            lower.contains("sony wh") -> 30
+            lower.contains("sennheiser") -> 42
+            else -> 40
+        }
+
+        val maxHours = when {
+            category.contains("In-Ear") -> 28
+            category.contains("Wired") -> 999
+            lower.contains("sennheiser") -> 60
+            lower.contains("philips") || lower.contains("tah") -> 80
+            lower.contains("jbl") -> 65
+            else -> 40
+        }
+
+        val ancHours = when {
+            category.contains("In-Ear") -> 18
+            category.contains("Wired") -> 999
+            lower.contains("sennheiser") -> 60
+            lower.contains("philips") || lower.contains("tah") -> 40
+            else -> 30
+        }
+
+        val codec = when {
+            lower.contains("sony") || lower.contains("ldac") || lower.contains("philips") || lower.contains("soundcore") -> "LDAC"
+            lower.contains("apple") || lower.contains("airpods") -> "AAC / Spatial"
+            lower.contains("sennheiser") || lower.contains("aptx") || lower.contains("bose") -> "aptX HD"
+            category.contains("Wired") -> "Hi-Res PCM 24-bit/96kHz"
+            else -> "AAC"
+        }
+
+        val connType = when {
+            category.contains("Wired") -> "USB-C / 3.5mm Direct Line"
+            lower.contains("5.4") -> "Bluetooth 5.4"
+            else -> "Bluetooth 5.3"
+        }
+
+        activeAudioCodec.value = codec
+        activeProtocolInfo.value = connType
+
+        updateSettings { current ->
+            current.copy(
+                connectedDeviceName = name,
+                headphoneCategory = category,
+                driverSizeMm = driverSize,
+                maxPlaytimeHours = maxHours,
+                ancPlaytimeHours = ancHours,
+                connectionType = connType,
+                activeCodec = codec
+            )
+        }
+    }
+
+    fun playBluetoothConnectChime() {
+        viewModelScope.launch {
+            com.example.util.BluetoothChimeSynthesizer.playConnectChime()
+        }
+    }
+
+    fun playBluetoothDisconnectChime() {
+        viewModelScope.launch {
+            com.example.util.BluetoothChimeSynthesizer.playDisconnectChime()
+        }
+    }
+
     fun connectDevice(device: String = "") {
         viewModelScope.launch {
             isConnecting.value = true
             isAutoReconnecting.value = false
             gattStatusMessage.value = "Koppelen via Bluetooth..."
             delay(1000)
+            val devName = if (device.isNotBlank()) device else _settingsState.value.connectedDeviceName
+            selectHeadphoneProfile(devName)
             updateSettings { current ->
                 current.copy(connected = true)
             }
             gattStatusMessage.value = "Connected"
             isConnecting.value = false
+            com.example.util.BluetoothChimeSynthesizer.playConnectChime()
+        }
+    }
+
+    fun connectCompatibleDevice(device: CompatibleBluetoothDevice) {
+        viewModelScope.launch {
+            isConnecting.value = true
+            isAutoReconnecting.value = false
+            gattStatusMessage.value = "Koppelen met ${device.name}..."
+            delay(800)
+            selectHeadphoneProfile(device.name, device.category)
+            
+            // Sync with scanned devices list
+            val currentScanned = scannedDevices.value.toMutableList()
+            if (currentScanned.none { it.name == device.name }) {
+                currentScanned.add(0, ScannedDevice(device.name, device.address, device.rssi, true))
+                scannedDevices.value = currentScanned
+            }
+            
+            // Add to multipoint list
+            addMultipointDevice(device.name)
+            
+            updateSettings { current ->
+                current.copy(
+                    connected = true,
+                    connectedDeviceName = device.name,
+                    headphoneCategory = device.category,
+                    driverSizeMm = device.driverSizeMm,
+                    maxPlaytimeHours = device.maxPlaytimeHours,
+                    ancPlaytimeHours = device.ancPlaytimeHours,
+                    connectionType = device.bluetoothVersion,
+                    activeCodec = device.supportedCodecs.firstOrNull() ?: "AAC"
+                )
+            }
+            gattStatusMessage.value = "Verbonden (${device.name})"
+            isConnecting.value = false
+            try {
+                com.example.util.BluetoothChimeSynthesizer.playConnectChime()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -486,6 +1012,9 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         gattStatusMessage.value = "Disconnected"
         isConnecting.value = false
         isAutoReconnecting.value = false
+        viewModelScope.launch {
+            com.example.util.BluetoothChimeSynthesizer.playDisconnectChime()
+        }
     }
 
     fun simulateConnectionLoss() {
@@ -496,6 +1025,9 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
             gattStatusMessage.value = "Disconnected (Signaal verloren)"
             isAutoReconnecting.value = true
             reconnectAttempts.value = 1
+            viewModelScope.launch {
+                com.example.util.BluetoothChimeSynthesizer.playDisconnectChime()
+            }
             delay(2000)
             if (!isAutoReconnecting.value) return@launch
             reconnectAttempts.value = 2
@@ -510,6 +1042,57 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                 current.copy(connected = true)
             }
             gattStatusMessage.value = "Connected"
+            com.example.util.BluetoothChimeSynthesizer.playConnectChime()
+        }
+    }
+
+    fun setAutoReconnectOnLaunch(enabled: Boolean) {
+        autoReconnectEnabled.value = enabled
+        updateSettings { current ->
+            current.copy(autoReconnectOnLaunch = enabled)
+        }
+    }
+
+    fun triggerLaunchAutoReconnect() {
+        if (isAutoReconnecting.value || isConnecting.value) return
+        viewModelScope.launch {
+            isAutoReconnecting.value = true
+            val targetDevice = _settingsState.value.lastPairedDeviceName.ifBlank { "Philips TAH6519" }
+            val targetAddress = _settingsState.value.lastPairedDeviceAddress.ifBlank { "00:11:22:33:44:55" }
+
+            gattStatusMessage.value = "Poging 1/3: Zoeken naar $targetDevice..."
+            reconnectAttempts.value = 1
+            delay(1200)
+            if (!isAutoReconnecting.value) return@launch
+
+            gattStatusMessage.value = "Poging 2/3: Bluetooth 5.3 Multipoint verbinding maken..."
+            reconnectAttempts.value = 2
+            delay(1200)
+            if (!isAutoReconnecting.value) return@launch
+
+            gattStatusMessage.value = "Poging 3/3: LDAC Audio & DSP Profiel laden..."
+            reconnectAttempts.value = 3
+            delay(1000)
+            if (!isAutoReconnecting.value) return@launch
+
+            isAutoReconnecting.value = false
+            reconnectAttempts.value = 0
+
+            selectHeadphoneProfile(targetDevice)
+            updateSettings { current ->
+                current.copy(
+                    connected = true,
+                    connectedDeviceName = targetDevice,
+                    lastPairedDeviceName = targetDevice,
+                    lastPairedDeviceAddress = targetAddress
+                )
+            }
+            gattStatusMessage.value = "Connected ($targetDevice)"
+            try {
+                com.example.util.BluetoothChimeSynthesizer.playConnectChime()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -791,13 +1374,24 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     fun fetchBatteryLevel() {
         viewModelScope.launch {
             isFetchingBattery.value = true
-            batteryFetchStatus.value = "Lezen via GATT..."
+            batteryFetchStatus.value = "Lezen via Bluetooth GATT service..."
             for (i in 1..10) {
-                delay(150)
-                batteryFetchProgress.value = i * 10f
+                delay(120)
+                batteryFetchProgress.value = i / 10f
+                if (i == 5) {
+                    batteryFetchStatus.value = "Batterijpercentage verifiëren..."
+                }
             }
-            batteryFetchStatus.value = "Klaar"
+            val currentLvl = _settingsState.value.batteryLevel
+            val refreshedLvl = if (currentLvl == 0) 85 else currentLvl
+            updateBatteryLevel(refreshedLvl)
+            batteryFetchStatus.value = "Batterijstatus bijgewerkt ($refreshedLvl%)"
             isFetchingBattery.value = false
+            try {
+                com.example.util.BluetoothChimeSynthesizer.playConnectChime(0.5f)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -808,6 +1402,24 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
             delay(1000)
             gattStatusMessage.value = "Versie: ${firmwareVersion.value}"
             isGattReading.value = false
+        }
+    }
+
+    fun toggleFindMySignal(enable: Boolean? = null) {
+        val newState = enable ?: !isFindMyBeeping.value
+        isFindMyBeeping.value = newState
+        if (newState) {
+            findMySignalStatus.value = "Signaal actief: TAH6519 piept..."
+            gattStatusMessage.value = "Find My signal: Sending acoustic beacon to TAH6519..."
+        } else {
+            findMySignalStatus.value = "Gereed voor opsporen"
+            gattStatusMessage.value = "Find My signal stopped"
+        }
+    }
+
+    fun setAudioProfilesOnboardingSeen(seen: Boolean) {
+        updateSettings { current ->
+            current.copy(hasSeenAudioProfilesOnboarding = seen)
         }
     }
 

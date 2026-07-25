@@ -55,7 +55,20 @@ data class HeadphoneSettings(
     val spatialAudioMode: String = "Stereo", // "Stereo", "Live Concert", "Cinematic 3D", "Acoustic Studio"
     val dynamicBassLevel: Int = 1, // 0 = Off, 1 = Low (Warm), 2 = Medium (Punchy), 3 = High (Thunder)
     val ldacQualityMode: String = "Balanced", // "Optimized (990kbps)", "Balanced (660kbps)", "Best Effort (330kbps)"
-    val ancCompensationEnabled: Boolean = true // Auto-correct sub-bass loss when ANC level is high
+    val ancCompensationEnabled: Boolean = true, // Auto-correct sub-bass loss when ANC level is high
+
+    // Universal Headphone Profile System
+    val connectedDeviceName: String = "Philips TAH6519",
+    val headphoneCategory: String = "Over-Ear Wireless", // "Over-Ear Wireless", "In-Ear / Earbuds", "On-Ear", "Gaming / Studio", "Wired 3.5mm / USB-C"
+    val driverSizeMm: Int = 40,
+    val maxPlaytimeHours: Int = 80,
+    val ancPlaytimeHours: Int = 40,
+    val connectionType: String = "Bluetooth 5.3",
+    val activeCodec: String = "LDAC",
+    val hasSeenAudioProfilesOnboarding: Boolean = false,
+    val lastPairedDeviceName: String = "Philips TAH6519",
+    val lastPairedDeviceAddress: String = "00:11:22:33:44:55",
+    val autoReconnectOnLaunch: Boolean = true
 ) {
     fun getBands(): List<Float> {
         return listOf(

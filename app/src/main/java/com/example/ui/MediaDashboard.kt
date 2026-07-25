@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +39,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.HeadphoneSettings
 import com.example.ui.theme.*
+import com.example.PremiumSlider
+import com.example.PhilipsPremiumSwitch
 import coil.compose.AsyncImage
 
 @Composable
@@ -80,6 +83,54 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
             repeatMode = RepeatMode.Restart
         ),
         label = "rotation"
+    )
+
+    // YouTube Music Stream Sync Animations
+    val ytSyncTransition = rememberInfiniteTransition(label = "yt_sync_animation")
+    val ytPulseRadius by ytSyncTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.45f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "yt_pulse_radius"
+    )
+    val ytPulseAlpha by ytSyncTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "yt_pulse_alpha"
+    )
+    val ytPulseRadius2 by ytSyncTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "yt_pulse_radius2"
+    )
+    val ytPulseAlpha2 by ytSyncTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "yt_pulse_alpha2"
+    )
+    val ytWaveGlow by ytSyncTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "yt_wave_glow"
     )
 
     val scale by animateFloatAsState(
@@ -374,7 +425,7 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
 
         // 3. PROGRESS BAR & TIMERS
         Column(modifier = Modifier.fillMaxWidth()) {
-            Slider(
+            PremiumSlider(
                 value = progressFraction,
                 onValueChange = { newVal ->
                     val newSecs = (newVal * totalDurationSecs).toInt()
@@ -396,49 +447,141 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
             }
         }
 
-        // 4. PLAYER CONTROL BUTTONS
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+        // 4. PLAYER CONTROL BUTTONS WITH YOUTUBE STREAM SYNC ANIMATION
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            IconButton(
-                onClick = { viewModel.playPreviousTrack() },
-                modifier = Modifier.size(56.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.FastRewind,
-                    contentDescription = "Vorige",
-                    tint = TextPrimary,
-                    modifier = Modifier.size(36.dp)
-                )
+                IconButton(
+                    onClick = { viewModel.playPreviousTrack() },
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FastRewind,
+                        contentDescription = "Vorige",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                // Play/Pause Button with Youtube Stream Sync Aura Rings
+                Box(
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isYoutubeActive && isPlaying) {
+                        // Outer Pulsing Aura Ring 2
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp * ytPulseRadius2)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFF0000).copy(alpha = ytPulseAlpha2))
+                        )
+                        // Outer Pulsing Aura Ring 1
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp * ytPulseRadius)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFF0000).copy(alpha = ytPulseAlpha))
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isYoutubeActive) {
+                                    Brush.radialGradient(
+                                        colors = listOf(Color(0xFFFF3333), Color(0xFFFF0000), Color(0xFFCC0000))
+                                    )
+                                } else {
+                                    Brush.radialGradient(
+                                        colors = listOf(HighlightSky, AccentPrimary)
+                                    )
+                                }
+                            )
+                            .border(
+                                width = if (isYoutubeActive && isPlaying) 2.dp else 1.dp,
+                                color = if (isYoutubeActive && isPlaying) Color.White.copy(alpha = ytWaveGlow) else Color.Transparent,
+                                shape = CircleShape
+                            )
+                            .clickable { viewModel.toggleMediaPlayer() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pauze" else "Afspelen",
+                            tint = Color.White,
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = { viewModel.playNextTrack() },
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FastForward,
+                        contentDescription = "Volgende",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(if (isYoutubeActive) Color(0xFFFF0000) else AccentPrimary)
-                    .clickable { viewModel.toggleMediaPlayer() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pauze" else "Afspelen",
-                    tint = Color.White,
-                    modifier = Modifier.size(44.dp)
-                )
-            }
+            // Live YouTube Sync Stream Indicator Bar
+            if (isYoutubeActive) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .background(Color(0xFFFF0000).copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+                        .border(1.dp, Color(0xFFFF0000).copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.height(12.dp)
+                    ) {
+                        for (i in 1..5) {
+                            val barH = if (isPlaying) {
+                                when (i) {
+                                    1 -> ytWaveGlow * 0.8f
+                                    2 -> (1f - ytWaveGlow) * 0.9f
+                                    3 -> ytWaveGlow
+                                    4 -> (1f - ytWaveGlow) * 0.7f
+                                    else -> ytWaveGlow * 0.9f
+                                }
+                            } else 0.2f
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .fillMaxHeight(barH)
+                                    .background(Color(0xFFFF0000), RoundedCornerShape(1.5.dp))
+                            )
+                        }
+                    }
+                    Text(
+                        text = if (isPlaying) "YOUTUBE MUSIC STREAM SYNCED • LIVE" else "YOUTUBE MUSIC PAUSED",
+                        color = Color(0xFFFF4D4D),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
 
-            IconButton(
-                onClick = { viewModel.playNextTrack() },
-                modifier = Modifier.size(56.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.FastForward,
-                    contentDescription = "Volgende",
-                    tint = TextPrimary,
-                    modifier = Modifier.size(36.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                YouTubeMusicVisualizer(
+                    viewModel = viewModel,
+                    settings = settings
                 )
             }
         }
@@ -685,7 +828,7 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                                 )
                             }
 
-                            Slider(
+                            PremiumSlider(
                                 value = audioMoodVolume,
                                 onValueChange = { viewModel.setAudioMoodVolume(it) },
                                 colors = SliderDefaults.colors(
@@ -784,7 +927,7 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Importeer YouTube Music Playlist URL",
+                            text = "Zoek op YouTube Music of Plak Playlist/Video URL",
                             color = TextPrimary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
@@ -798,7 +941,7 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                             OutlinedTextField(
                                 value = playlistInputUrl,
                                 onValueChange = { playlistInputUrl = it },
-                                placeholder = { Text("https://music.youtube.com/playlist?list=...", fontSize = 11.sp, color = TextMuted) },
+                                placeholder = { Text("Typ een nummer/artiest of plak URL...", fontSize = 11.sp, color = TextMuted) },
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = TextPrimary,
                                     unfocusedTextColor = TextPrimary,
@@ -1155,6 +1298,7 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -1182,6 +1326,20 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                             )
                         }
                     }
+                    PhilipsPremiumSwitch(
+                        checked = settings.ancMode != "OFF",
+                        onCheckedChange = { isChecked ->
+                            if (isChecked) {
+                                viewModel.toggleAnc(true)
+                                viewModel.setAncMode("ON")
+                            } else {
+                                viewModel.toggleAnc(false)
+                                viewModel.setAncMode("OFF")
+                            }
+                        },
+                        modifier = Modifier.testTag("anc_mediadashboard_switch"),
+                        activeColor = HighlightSky
+                    )
                 }
 
                 Row(
@@ -1387,7 +1545,7 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                                 fontSize = 13.sp
                             )
                         }
-                        Slider(
+                        PremiumSlider(
                             value = customMinutes.toFloat(),
                             onValueChange = { customMinutes = it.toInt() },
                             valueRange = 1f..120f,
@@ -1535,6 +1693,80 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                             uncheckedTrackColor = DarkBg
                         )
                     )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 8. AMBIENT PARTICLE VISUALIZER CARD (Integrated from AmbientVisualizer.kt)
+        var showAmbientVisualizer by remember { mutableStateOf(false) }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            border = BorderStroke(1.dp, if (showAmbientVisualizer) AccentPrimary.copy(alpha = 0.6f) else DarkBorder),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(AccentPrimary.copy(alpha = 0.15f), CircleShape)
+                                .border(1.dp, AccentPrimary.copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = "Ambient Visualizer",
+                                tint = AccentPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Sfeer & Deeltjes Visualizer",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "3D deeltjes & frequentiespectrum visualizer",
+                                color = TextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    Switch(
+                        checked = showAmbientVisualizer,
+                        onCheckedChange = { showAmbientVisualizer = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = AccentPrimary,
+                            uncheckedThumbColor = TextMuted,
+                            uncheckedTrackColor = DarkBg
+                        )
+                    )
+                }
+
+                if (showAmbientVisualizer) {
+                    HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+                    FullScreenAmbientVisualizer(viewModel = viewModel, settings = settings)
                 }
             }
         }
