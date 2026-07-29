@@ -63,6 +63,9 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
+    // DataStore Preferences
+    implementation(libs.androidx.datastore.preferences)
+
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
@@ -76,6 +79,11 @@ dependencies {
 
     // Coil
     implementation(libs.coil.compose)
+
+    // Media3 ExoPlayer & MediaSession
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.media3.ui)
 
     // Testing
     testImplementation(libs.junit)

@@ -14,8 +14,13 @@ enum class AppTheme {
     PHILIPS_STUDIO, HIGH_CONTRAST, NORDIC_FROST, CYBERPUNK_NEON, CARBON_AMBER
 }
 
+enum class ThemeMode {
+    SYSTEM, DARK, LIGHT
+}
+
 object ThemeState {
     var activeTheme by mutableStateOf(AppTheme.PHILIPS_STUDIO)
+    var themeMode by mutableStateOf(ThemeMode.DARK)
     var isLightMode by mutableStateOf(false)
 }
 
@@ -36,10 +41,18 @@ fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (ThemeState.isLightMode) {
-        LightColorScheme
-    } else {
+    val isDark = when (ThemeState.themeMode) {
+        ThemeMode.SYSTEM -> darkTheme
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+    }
+
+    ThemeState.isLightMode = !isDark
+
+    val colorScheme = if (isDark) {
         DarkColorScheme
+    } else {
+        LightColorScheme
     }
 
     MaterialTheme(

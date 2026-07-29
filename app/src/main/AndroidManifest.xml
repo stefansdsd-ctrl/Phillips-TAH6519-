@@ -18,6 +18,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
     <application
+        android:name=".Tah6519Application"
         android:allowBackup="true"
         android:label="@string/app_name">
         <service

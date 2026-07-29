@@ -69,7 +69,11 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
     val sleepTimerRunning by viewModel.sleepTimerRunning.collectAsStateWithLifecycle()
     val sleepTimerAction by viewModel.sleepTimerAction.collectAsStateWithLifecycle()
 
-    var activeTab by remember { mutableStateOf(if (isYoutubeActive) "YOUTUBE" else "APP") }
+    val mediaQueue by viewModel.exoPlayerController.queue.collectAsStateWithLifecycle()
+    val mediaQueueIndex by viewModel.exoPlayerController.currentIndex.collectAsStateWithLifecycle()
+    val isMediaSessionActive by viewModel.exoPlayerController.isMedia3SessionActive.collectAsStateWithLifecycle()
+
+    var activeTab by remember { mutableStateOf("QUEUE") }
     var playlistInputUrl by remember { mutableStateOf("") }
     val isYoutubeImporting by viewModel.isYoutubeImporting.collectAsStateWithLifecycle()
     val youtubeImportMessage by viewModel.youtubeImportMessage.collectAsStateWithLifecycle()
@@ -197,70 +201,74 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                 )
 
                 // 1b. Rotating Vinyl / CD of the current track at the center!
-                val trackModel = if (isYoutubeActive && youtubePlaylistTracks.isNotEmpty() && currentTrackIndex in youtubePlaylistTracks.indices) {
-                    "https://img.youtube.com/vi/${youtubePlaylistTracks[currentTrackIndex].youtubeId}/hqdefault.jpg"
-                } else {
-                    R.drawable.album_cover_synth_1783687331450
-                }
-                
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
+                if (isYoutubeActive && youtubePlaylistTracks.isNotEmpty() && currentTrackIndex in youtubePlaylistTracks.indices) {
+                    val activeTrack = youtubePlaylistTracks[currentTrackIndex]
                     Box(
                         modifier = Modifier
-                            .size(170.dp)
-                            .graphicsLayer {
-                                rotationZ = if (isPlaying) rotationAngle else 0f
-                            }
-                            .background(Color(0xFF0F1424), CircleShape)
-                            .border(6.dp, Color(0xFF070B14), CircleShape)
-                            .border(8.dp, HighlightSky.copy(alpha = 0.2f), CircleShape),
+                            .fillMaxWidth(0.92f)
+                            .height(175.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.5.dp, Color(0xFFFF0000).copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                            .background(Color.Black),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Vinyl Grooves effect (concentric circles)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize(0.9f)
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
-                                .border(5.dp, Color.Transparent, CircleShape)
-                                .border(6.dp, Color.White.copy(alpha = 0.05f), CircleShape)
-                                .border(15.dp, Color.Transparent, CircleShape)
-                                .border(16.dp, Color.White.copy(alpha = 0.06f), CircleShape)
+                        YouTubePlayer(
+                            youtubeId = activeTrack.youtubeId,
+                            isPlaying = isPlaying,
+                            progressSecs = trackProgressSecs
                         )
-                        
-                        // Album Artwork at the center of the Vinyl
+                    }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         Box(
                             modifier = Modifier
-                                .size(78.dp)
-                                .clip(CircleShape)
-                                .background(DarkBg)
+                                .size(170.dp)
+                                .graphicsLayer {
+                                    rotationZ = if (isPlaying) rotationAngle else 0f
+                                }
+                                .background(Color(0xFF0F1424), CircleShape)
+                                .border(6.dp, Color(0xFF070B14), CircleShape)
+                                .border(8.dp, HighlightSky.copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            if (trackModel is String) {
-                                AsyncImage(
-                                    model = trackModel,
-                                    contentDescription = "Track Art Center",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
+                            // Vinyl Grooves effect (concentric circles)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize(0.9f)
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                                    .border(5.dp, Color.Transparent, CircleShape)
+                                    .border(6.dp, Color.White.copy(alpha = 0.05f), CircleShape)
+                                    .border(15.dp, Color.Transparent, CircleShape)
+                                    .border(16.dp, Color.White.copy(alpha = 0.06f), CircleShape)
+                            )
+                            
+                            // Album Artwork at the center of the Vinyl
+                            Box(
+                                modifier = Modifier
+                                    .size(78.dp)
+                                    .clip(CircleShape)
+                                    .background(DarkBg)
+                            ) {
                                 Image(
-                                    painter = painterResource(id = trackModel as Int),
+                                    painter = painterResource(id = R.drawable.album_cover_synth_1783687331450),
                                     contentDescription = "Track Art Center",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
+                            
+                            // Vinyl spindle hole at center
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .background(Color(0xFF070B14), CircleShape)
+                                    .border(1.5.dp, HighlightSky.copy(alpha = 0.5f), CircleShape)
+                            )
                         }
-                        
-                        // Vinyl spindle hole at center
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .background(Color(0xFF070B14), CircleShape)
-                                .border(1.5.dp, HighlightSky.copy(alpha = 0.5f), CircleShape)
-                        )
                     }
                 }
                 
@@ -317,30 +325,50 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                     }
                 }
 
-                // YouTube Music Premium Floating Pill Overlay
-                Box(
+                // YouTube Music / Media3 ExoPlayer Session Floating Pill Overlay
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(16.dp)
-                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
-                        .border(1.dp, if (isYoutubeActive) Color(0xFFFF0000).copy(alpha = 0.6f) else HighlightSky.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    Box(
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                            .border(1.dp, if (isYoutubeActive) Color(0xFFFF0000).copy(alpha = 0.6f) else HighlightSky.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(if (isYoutubeActive) Color(0xFFFF0000) else HighlightSky, CircleShape)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(if (isYoutubeActive) Color(0xFFFF0000) else HighlightSky, CircleShape)
+                            )
+                            Text(
+                                text = if (isYoutubeActive) "YT MUSIC STREAM" else "STUDIO PLAYER",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF0D182E).copy(alpha = 0.85f), RoundedCornerShape(8.dp))
+                            .border(1.dp, HighlightSky.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
                         Text(
-                            text = if (isYoutubeActive) "YT MUSIC ACTIVE" else "STUDIO PLAYER",
-                            color = Color.White,
+                            text = "MEDIA3 EXOPLAYER SESSION",
+                            color = HighlightSky,
                             fontSize = 9.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
                         )
                     }
                 }
@@ -588,30 +616,42 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 5. THEMED SOURCE TABS (SWITCHER BETWEEN APP & YOUTUBE MUSIC)
+        // 5. THEMED SOURCE TABS (SWITCHER BETWEEN QUEUE, YOUTUBE & APP PLAYLIST)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DarkBg.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 .border(1.dp, DarkBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            listOf("APP" to "App Playlist", "YOUTUBE" to "YouTube Music").forEach { (tab, label) ->
+            listOf(
+                "QUEUE" to "Wachtrij",
+                "YOUTUBE" to "YouTube Music",
+                "APP" to "App Playlist"
+            ).forEach { (tab, label) ->
                 val selected = activeTab == tab
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .background(
                             if (selected) {
-                                if (tab == "YOUTUBE") Color(0xFFFF0000).copy(alpha = 0.15f) else HighlightSky.copy(alpha = 0.15f)
+                                when (tab) {
+                                    "YOUTUBE" -> Color(0xFFFF0000).copy(alpha = 0.18f)
+                                    "QUEUE" -> Color(0xFF0066FF).copy(alpha = 0.18f)
+                                    else -> HighlightSky.copy(alpha = 0.18f)
+                                }
                             } else Color.Transparent,
                             shape = RoundedCornerShape(8.dp)
                         )
                         .border(
                             width = 1.dp,
                             color = if (selected) {
-                                if (tab == "YOUTUBE") Color(0xFFFF0000) else HighlightSky
+                                when (tab) {
+                                    "YOUTUBE" -> Color(0xFFFF0000)
+                                    "QUEUE" -> Color(0xFF0066FF)
+                                    else -> HighlightSky
+                                }
                             } else Color.Transparent,
                             shape = RoundedCornerShape(8.dp)
                         )
@@ -619,11 +659,12 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                             activeTab = tab
                             if (tab == "YOUTUBE") {
                                 viewModel.setYoutubeActive(true)
-                            } else {
+                            } else if (tab == "APP") {
                                 viewModel.playTrack(0)
                             }
                         }
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 10.dp)
+                        .testTag("tab_button_$tab"),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -633,13 +674,21 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
-                                .background(if (tab == "YOUTUBE") Color(0xFFFF0000) else HighlightSky, CircleShape)
+                                .background(
+                                    when (tab) {
+                                        "YOUTUBE" -> Color(0xFFFF0000)
+                                        "QUEUE" -> Color(0xFF0066FF)
+                                        else -> HighlightSky
+                                    },
+                                    CircleShape
+                                )
                         )
                         Text(
                             text = label,
                             color = if (selected) TextPrimary else TextMuted,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
                         )
                     }
                 }
@@ -647,7 +696,41 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
         }
 
         // 6. DETAILED VIEW DEPENDING ON ACTIVE SOURCE TAB
-        if (activeTab == "YOUTUBE") {
+        AnimatedContent(
+            targetState = activeTab,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(durationMillis = 250, easing = LinearOutSlowInEasing)) togetherWith
+                    fadeOut(animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing))
+            },
+            label = "media_subtab_crossfade"
+        ) { targetSubTab ->
+            if (targetSubTab == "QUEUE") {
+            // ==========================================
+            // NOW PLAYING MEDIA3 QUEUE MODE
+            // ==========================================
+            NowPlayingQueueView(
+                queue = mediaQueue,
+                currentIndex = mediaQueueIndex,
+                isPlaying = isPlaying,
+                isMediaSessionActive = isMediaSessionActive,
+                onSkipToTrack = { idx ->
+                    viewModel.exoPlayerController.skipToQueueItem(idx)
+                    viewModel.currentTrackIndex.value = idx
+                },
+                onRemoveTrack = { idx ->
+                    viewModel.exoPlayerController.removeQueueItem(idx)
+                },
+                onClearQueue = {
+                    viewModel.exoPlayerController.clearQueue()
+                },
+                onLoadYoutubeQueue = {
+                    viewModel.setYoutubeActive(true)
+                },
+                onLoadAppQueue = {
+                    viewModel.playTrack(0)
+                }
+            )
+        } else if (activeTab == "YOUTUBE") {
             // ==========================================
             // YOUTUBE MUSIC PLAYLIST DASHBOARD MODE
             // ==========================================
@@ -1046,11 +1129,29 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                             )
                         }
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Geïmporteerde YouTube tracks • ${youtubePlaylistTracks.size} nummers",
-                            color = TextMuted,
-                            fontSize = 11.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Geïmporteerde YouTube tracks • ${youtubePlaylistTracks.size} nummers",
+                                color = TextMuted,
+                                fontSize = 11.sp
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .background(StatusSuccess.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                    .border(0.5.dp, StatusSuccess.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "💾 Room DB Offline",
+                                    color = StatusSuccess,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                         if (youtubeLastSyncedTime.isNotBlank()) {
                             Text(
                                 text = "Laatst gesynchroniseerd: $youtubeLastSyncedTime",
@@ -1277,6 +1378,7 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                     }
                 }
             }
+        }
         }
 
         // 9. ANC CONTROL CARD
@@ -1767,6 +1869,326 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                 if (showAmbientVisualizer) {
                     HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
                     FullScreenAmbientVisualizer(viewModel = viewModel, settings = settings)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NowPlayingQueueView(
+    queue: List<com.example.media.MediaQueueItem>,
+    currentIndex: Int,
+    isPlaying: Boolean,
+    isMediaSessionActive: Boolean,
+    onSkipToTrack: (Int) -> Unit,
+    onRemoveTrack: (Int) -> Unit,
+    onClearQueue: () -> Unit,
+    onLoadYoutubeQueue: () -> Unit,
+    onLoadAppQueue: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("now_playing_queue_view"),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Queue Header Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            border = BorderStroke(1.dp, HighlightSky.copy(alpha = 0.4f)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(HighlightSky.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QueueMusic,
+                                contentDescription = "Now Playing Queue",
+                                tint = HighlightSky,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "NOW PLAYING WACHTRIJ",
+                                color = TextPrimary,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(if (isMediaSessionActive) StatusSuccess else Color.Yellow, CircleShape)
+                                )
+                                Text(
+                                    text = if (isMediaSessionActive) "MediaSession Actief • ${queue.size} nummers" else "MediaSession Offline",
+                                    color = if (isMediaSessionActive) StatusSuccess else Color.Yellow,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+
+                    if (queue.isNotEmpty()) {
+                        OutlinedButton(
+                            onClick = onClearQueue,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF4D4D)),
+                            border = BorderStroke(1.dp, Color(0xFFFF4D4D).copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .height(32.dp)
+                                .testTag("clear_queue_button")
+                        ) {
+                            Icon(Icons.Default.DeleteOutline, contentDescription = "Wis wachtrij", modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Wis", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                if (queue.isNotEmpty()) {
+                    val totalSecs = queue.sumOf { it.durationSecs }
+                    val totalMins = totalSecs / 60
+                    val activeNum = (currentIndex + 1).coerceIn(1, queue.size)
+                    Text(
+                        text = "Nummer $activeNum van ${queue.size} wordt afgespeeld • Totale duur: ~$totalMins min",
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        if (queue.isEmpty()) {
+            // Empty State Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = DarkCard),
+                border = BorderStroke(1.dp, DarkBorder),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Empty Queue",
+                        tint = TextMuted,
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Text(
+                        text = "Geen nummers in de wachtrij",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Laad nummers uit de App Playlist of YouTube Music om de actieve MediaSession te vullen.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = onLoadAppQueue,
+                            colors = ButtonDefaults.buttonColors(containerColor = HighlightSky),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("load_app_queue_button")
+                        ) {
+                            Text("Laad App Playlist", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = onLoadYoutubeQueue,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF0000)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("load_yt_queue_button")
+                        ) {
+                            Text("Laad YT Music", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        } else {
+            // List-Based Navigation for MediaQueue
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                queue.forEachIndexed { index, item ->
+                    val isCurrent = index == currentIndex
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSkipToTrack(index) }
+                            .testTag("queue_item_$index"),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isCurrent) {
+                                if (item.isYoutube) Color(0xFFFF0000).copy(alpha = 0.15f) else HighlightSky.copy(alpha = 0.15f)
+                            } else DarkCard
+                        ),
+                        border = BorderStroke(
+                            width = if (isCurrent) 1.5.dp else 1.dp,
+                            color = if (isCurrent) {
+                                if (item.isYoutube) Color(0xFFFF0000) else HighlightSky
+                            } else DarkBorder
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Left Index / Soundwave Badge
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isCurrent) {
+                                            if (item.isYoutube) Color(0xFFFF0000) else HighlightSky
+                                        } else DarkBg
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isCurrent && isPlaying) {
+                                    Icon(
+                                        imageVector = Icons.Default.GraphicEq,
+                                        contentDescription = "Playing Now",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        text = "#${index + 1}",
+                                        color = if (isCurrent) Color.White else TextMuted,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Thumbnail or Icon
+                            if (item.isYoutube && !item.youtubeId.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = "https://img.youtube.com/vi/${item.youtubeId}/hqdefault.jpg",
+                                    contentDescription = "Queue thumbnail",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                            }
+
+                            // Title & Artist
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = item.title,
+                                    color = if (isCurrent) {
+                                        if (item.isYoutube) Color(0xFFFF4D4D) else HighlightSky
+                                    } else TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = item.artist,
+                                        color = TextMuted,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                if (item.isYoutube) Color(0xFFFF0000).copy(alpha = 0.2f) else DarkBg,
+                                                RoundedCornerShape(4.dp)
+                                            )
+                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(
+                                            text = if (item.isYoutube) "YT MUSIC" else "STUDIO",
+                                            color = if (item.isYoutube) Color(0xFFFF4D4D) else HighlightSky,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Duration & Delete Button
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val m = item.durationSecs / 60
+                                val s = item.durationSecs % 60
+                                Text(
+                                    text = String.format("%d:%02d", m, s),
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+
+                                IconButton(
+                                    onClick = { onRemoveTrack(index) },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Verwijder uit wachtrij",
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

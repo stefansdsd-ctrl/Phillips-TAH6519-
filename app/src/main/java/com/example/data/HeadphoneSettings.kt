@@ -68,7 +68,18 @@ data class HeadphoneSettings(
     val hasSeenAudioProfilesOnboarding: Boolean = false,
     val lastPairedDeviceName: String = "Philips TAH6519",
     val lastPairedDeviceAddress: String = "00:11:22:33:44:55",
-    val autoReconnectOnLaunch: Boolean = true
+    val autoReconnectOnLaunch: Boolean = true,
+    
+    // Intelligent Battery Preservation
+    val intelligentBatteryPreservationEnabled: Boolean = true,
+    val intelligentBatteryThreshold: Int = 20, // Low power threshold (percentage)
+    val bluetoothPollingIntervalMs: Int = 1000, // 1000ms normal, 5000ms eco
+    val isBatteryPreservationActive: Boolean = false, // Dynamic preservation state
+    val batteryPreservationAncCap: Int = 1, // Dynamic ANC intensity cap when active (1 = Low/Eco)
+
+    // Cached YouTube Music Metadata
+    val cachedYoutubePlaylistName: String = "Mijn YouTube Playlist",
+    val cachedYoutubeLastSyncedTime: String = "Niet gesynchroniseerd"
 ) {
     fun getBands(): List<Float> {
         return listOf(

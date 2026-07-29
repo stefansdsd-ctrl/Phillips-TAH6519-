@@ -88,13 +88,30 @@ import com.example.ui.UpdateState
 import com.example.ui.theme.*
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            val attributionContext = newBase.createAttributionContext("default")
+            super.attachBaseContext(attributionContext)
+        } else {
+            super.attachBaseContext(newBase)
+        }
+    }
+
+    override fun getAttributionTag(): String? {
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            "default"
+        } else {
+            super.getAttributionTag()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         // Room database and repository setup
         val database = AppDatabase.getDatabase(applicationContext)
-        val repository = HeadphoneRepository(database.headphoneDao())
+        val repository = HeadphoneRepository(database.headphoneDao(), database.cachedTrackDao())
         val viewModel: HeadphoneViewModel by viewModels { HeadphoneViewModelFactory(application, repository) }
 
         setContent {
@@ -131,16 +148,10 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
     val melodyScope = rememberCoroutineScope()
 
     LaunchedEffect(
-        mediaIsPlaying, currentTrackIndex, isYoutubeActive, mediaTrackName,
-        settings.activePreset, settings.dynamicBassEnabled, settings.dynamicBassLevel, settings.spatialAudioMode,
-        settings.band60, settings.band125, settings.band250, settings.band500, settings.band1000,
-        settings.band2000, settings.band4000, settings.band8000, settings.band12000, settings.band16000
+        mediaIsPlaying, currentTrackIndex, isYoutubeActive, mediaTrackName
     ) {
-        if (mediaIsPlaying) {
-            melodySynthesizer.startMelody(currentTrackIndex, isYoutubeActive, settings, mediaTrackName, melodyScope)
-        } else {
-            melodySynthesizer.stopMelody()
-        }
+        // Stop synthetic monotones so real stream and YouTube audio are played cleanly
+        melodySynthesizer.stopMelody()
     }
 
     // Trigger background auto-reconnect service on launch for last paired device
@@ -267,6 +278,8 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
     var eqBandMode by remember { mutableStateOf("5-BAND") }
     var showPairingGuide by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showHardwareManualDialog by remember { mutableStateOf(false) }
+    var showBleScannerDialog by remember { mutableStateOf(false) }
     var hasPromptedForUpdate by remember { mutableStateOf(false) }
 
     // Automatically check for available firmware updates when the headphone is connected
@@ -333,17 +346,61 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
         SettingsDialog(viewModel = viewModel, onDismiss = { showSettings = false })
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (isYoutubeActive && youtubePlaylistTracks.isNotEmpty() && currentTrackIndex in youtubePlaylistTracks.indices) {
-            val activeTrack = youtubePlaylistTracks[currentTrackIndex]
-            Box(modifier = Modifier.size(1.dp).alpha(0f)) {
-                com.example.ui.YouTubePlayer(
-                    youtubeId = activeTrack.youtubeId,
-                    isPlaying = mediaIsPlaying,
-                    progressSecs = trackProgressSecs
-                )
+    if (showHardwareManualDialog) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showHardwareManualDialog = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            com.example.ui.PhilipsHardwareManualScreen(
+                onClose = { showHardwareManualDialog = false },
+                viewModel = viewModel
+            )
+        }
+    }
+
+    if (showBleScannerDialog) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showBleScannerDialog = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(DarkBg)) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().background(DarkPanel).padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Bluetooth,
+                                contentDescription = null,
+                                tint = HighlightSky,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Bluetooth LE Scanner & GATT",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                        }
+                        IconButton(onClick = { showBleScannerDialog = false }) {
+                            Icon(imageVector = Icons.Filled.Close, contentDescription = "Sluiten", tint = TextMuted)
+                        }
+                    }
+                    com.example.ui.PhilipsBleScannerScreen(
+                        viewModel = viewModel,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = DarkBg,
@@ -484,11 +541,11 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                             onClick = {
                                 val isHC = !ThemeState.isLightMode && ThemeState.activeTheme == com.example.ui.theme.AppTheme.HIGH_CONTRAST
                                 if (isHC) {
-                                    ThemeState.isLightMode = true
-                                    ThemeState.activeTheme = com.example.ui.theme.AppTheme.PHILIPS_STUDIO
+                                    viewModel.setThemeMode(com.example.ui.theme.ThemeMode.LIGHT)
+                                    viewModel.setActiveAppTheme(com.example.ui.theme.AppTheme.PHILIPS_STUDIO)
                                 } else {
-                                    ThemeState.isLightMode = false
-                                    ThemeState.activeTheme = com.example.ui.theme.AppTheme.HIGH_CONTRAST
+                                    viewModel.setThemeMode(com.example.ui.theme.ThemeMode.DARK)
+                                    viewModel.setActiveAppTheme(com.example.ui.theme.AppTheme.HIGH_CONTRAST)
                                 }
                             },
                             modifier = Modifier
@@ -500,6 +557,22 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 imageVector = if (isHC) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
                                 contentDescription = "Thema omschakelen",
                                 tint = if (isHC) AccentPrimary else TextMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        IconButton(
+                            onClick = { showHardwareManualDialog = true },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .testTag("topbar_manual_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = "Handleiding & Gids",
+                                tint = AccentPrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -809,8 +882,11 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
             AnimatedContent(
                 targetState = activeTab,
                 transitionSpec = {
-                    (fadeIn(animationSpec = tween(250, delayMillis = 50)) + scaleIn(initialScale = 0.95f, animationSpec = tween(250, delayMillis = 50)))
-                        .togetherWith(fadeOut(animationSpec = tween(120)))
+                    fadeIn(
+                        animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing)
+                    ) togetherWith fadeOut(
+                        animationSpec = tween(durationMillis = 250, easing = FastOutLinearInEasing)
+                    )
                 },
                 label = "tab_content_animation",
                 modifier = Modifier.fillMaxSize()
@@ -827,6 +903,15 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                         "dash" -> {
                             item {
                                 DashboardHeroCard(settings, isCharging)
+                            }
+                            if (settings.connected) {
+                                item {
+                                    Tah6519EstimatedBatteryBanner(
+                                        settings = settings,
+                                        isCharging = isCharging,
+                                        onNavigateToBattery = { activeTab = "device" }
+                                    )
+                                }
                             }
                             item {
                                 UniversalHeadphoneSelectorCard(viewModel, settings)
@@ -869,7 +954,9 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                     isFetchingBattery = isFetchingBattery,
                                     batteryFetchProgress = batteryFetchProgress,
                                     batteryFetchStatus = batteryFetchStatus,
-                                    onFetchBattery = { viewModel.fetchBatteryLevel() }
+                                    onFetchBattery = { viewModel.fetchBatteryLevel() },
+                                    settings = settings,
+                                    viewModel = viewModel
                                 )
                             }
                             item {
@@ -1436,17 +1523,11 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                     enter = expandVertically() + fadeIn(),
                                     exit = shrinkVertically() + fadeOut()
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(140.dp)
-                                            .background(DarkCard, shape = RoundedCornerShape(12.dp))
-                                            .border(1.dp, StatusPurple.copy(alpha = 0.5f), shape = RoundedCornerShape(12.dp))
-                                            .padding(12.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        SpatialAudioVisualizer()
-                                    }
+                                    SpatialReverbEngineCard(
+                                        viewModel = viewModel,
+                                        settings = settings,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
                                 }
                                 
                                 ToggleRow(
@@ -1642,7 +1723,9 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 isFetchingBattery = isFetchingBattery,
                                 batteryFetchProgress = batteryFetchProgress,
                                 batteryFetchStatus = batteryFetchStatus,
-                                onFetchBattery = { viewModel.fetchBatteryLevel() }
+                                onFetchBattery = { viewModel.fetchBatteryLevel() },
+                                settings = settings,
+                                viewModel = viewModel
                             )
                         }
 
@@ -1713,7 +1796,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                                         shape = RoundedCornerShape(12.dp)
                                                     )
                                                     .clickable {
-                                                        ThemeState.activeTheme = theme
+                                                        viewModel.setActiveAppTheme(theme)
                                                     }
                                                     .padding(vertical = 12.dp),
                                                 contentAlignment = Alignment.Center
@@ -1754,8 +1837,9 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                             .background(DarkBg, shape = RoundedCornerShape(12.dp))
                                             .border(1.dp, DarkBorder, shape = RoundedCornerShape(12.dp))
                                             .clickable {
-                                                ThemeState.isLightMode = false
-                                                ThemeState.activeTheme = if (ThemeState.activeTheme == com.example.ui.theme.AppTheme.HIGH_CONTRAST) com.example.ui.theme.AppTheme.PHILIPS_STUDIO else com.example.ui.theme.AppTheme.HIGH_CONTRAST
+                                                val nextTheme = if (ThemeState.activeTheme == com.example.ui.theme.AppTheme.HIGH_CONTRAST) com.example.ui.theme.AppTheme.PHILIPS_STUDIO else com.example.ui.theme.AppTheme.HIGH_CONTRAST
+                                                viewModel.setThemeMode(com.example.ui.theme.ThemeMode.DARK)
+                                                viewModel.setActiveAppTheme(nextTheme)
                                             }
                                             .padding(12.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1797,11 +1881,11 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                             checked = !ThemeState.isLightMode && ThemeState.activeTheme == com.example.ui.theme.AppTheme.HIGH_CONTRAST,
                                             onCheckedChange = { isChecked ->
                                                 if (isChecked) {
-                                                    ThemeState.isLightMode = false
-                                                    ThemeState.activeTheme = com.example.ui.theme.AppTheme.HIGH_CONTRAST
+                                                    viewModel.setThemeMode(com.example.ui.theme.ThemeMode.DARK)
+                                                    viewModel.setActiveAppTheme(com.example.ui.theme.AppTheme.HIGH_CONTRAST)
                                                 } else {
-                                                    ThemeState.isLightMode = false
-                                                    ThemeState.activeTheme = com.example.ui.theme.AppTheme.PHILIPS_STUDIO
+                                                    viewModel.setThemeMode(com.example.ui.theme.ThemeMode.DARK)
+                                                    viewModel.setActiveAppTheme(com.example.ui.theme.AppTheme.PHILIPS_STUDIO)
                                                 }
                                             },
                                             colors = SwitchDefaults.colors(
@@ -2368,6 +2452,141 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                              }
                          }
 
+                        // Interactive Manual Card
+                        item {
+                            SectionHeader(title = "Officiele Handleiding & Knopbediening")
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("open_manual_card"),
+                                colors = CardDefaults.cardColors(containerColor = DarkPanel),
+                                border = BorderStroke(1.dp, DarkBorder),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .background(AccentPrimary.copy(alpha = 0.2f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Headphones,
+                                                contentDescription = null,
+                                                tint = AccentPrimary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Column {
+                                            Text(
+                                                text = "Philips TAH6519 Handleiding",
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                text = "Interactief knoppendiagram, LED status & resetgids",
+                                                color = TextMuted,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    Button(
+                                        onClick = { showHardwareManualDialog = true },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = AccentPrimary,
+                                            contentColor = Color.White
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("btn_open_manual")
+                                    ) {
+                                        Text(
+                                            text = "Bekijk Handleiding & LED Gids",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // BLE Scanner Card
+                        item {
+                            SectionHeader(title = "Bluetooth LE Scanner & Live GATT")
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("open_ble_scanner_card"),
+                                colors = CardDefaults.cardColors(containerColor = DarkPanel),
+                                border = BorderStroke(1.dp, DarkBorder),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .background(HighlightSky.copy(alpha = 0.2f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Bluetooth,
+                                                contentDescription = null,
+                                                tint = HighlightSky,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Column {
+                                            Text(
+                                                text = "Zoek Nabije Bluetooth LE Apparaten",
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                text = "Live RSSI signaalsterkte & TAH6519 GATT services",
+                                                color = TextMuted,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    Button(
+                                        onClick = { showBleScannerDialog = true },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = DarkCard,
+                                            contentColor = HighlightSky
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, HighlightSky.copy(alpha = 0.4f)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("btn_open_ble_scanner")
+                                    ) {
+                                        Text(
+                                            text = "Open BLE Scanner & Service Explorer",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         // About specs sheet
                         item {
                             SectionHeader(title = "Technische Specificaties")
@@ -2543,12 +2762,25 @@ fun MiniBatteryIndicator(
         label = "mini_battery_level"
     )
 
+    val pulseTransition = rememberInfiniteTransition(label = "mini_pulse")
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "mini_pulse_alpha"
+    )
+
     val color = when {
         isCharging -> HighlightSky
         batteryLevel <= 20 -> StatusDanger
         batteryLevel <= 50 -> StatusYellow
         else -> StatusSuccess
     }
+    
+    val currentFillAlpha = if (isCharging) pulseAlpha else 1f
 
     Row(
         modifier = modifier
@@ -2564,7 +2796,7 @@ fun MiniBatteryIndicator(
             modifier = Modifier
                 .width(20.dp)
                 .height(11.dp)
-                .border(1.dp, color.copy(alpha = 0.8f), shape = RoundedCornerShape(2.dp))
+                .border(1.dp, color.copy(alpha = 0.8f * currentFillAlpha), shape = RoundedCornerShape(2.dp))
                 .padding(1.dp),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -2573,7 +2805,7 @@ fun MiniBatteryIndicator(
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(animatedLevel / 100f)
-                    .background(color, shape = RoundedCornerShape(1.dp))
+                    .background(color.copy(alpha = currentFillAlpha), shape = RoundedCornerShape(1.dp))
             )
             
             // If charging, overlay dynamic pulse/flash or icon
@@ -2581,7 +2813,7 @@ fun MiniBatteryIndicator(
                 Icon(
                     imageVector = Icons.Filled.FlashOn,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = Color.White.copy(alpha = pulseAlpha),
                     modifier = Modifier
                         .size(8.dp)
                         .align(Alignment.Center)
@@ -2594,12 +2826,12 @@ fun MiniBatteryIndicator(
             modifier = Modifier
                 .width(1.5.dp)
                 .height(3.dp)
-                .background(color.copy(alpha = 0.8f), shape = RoundedCornerShape(topEnd = 1.dp, bottomEnd = 1.dp))
+                .background(color.copy(alpha = 0.8f * currentFillAlpha), shape = RoundedCornerShape(topEnd = 1.dp, bottomEnd = 1.dp))
         )
 
         Text(
             text = "$batteryLevel%",
-            color = TextPrimary,
+            color = if (isCharging) color.copy(alpha = pulseAlpha) else TextPrimary,
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.2).sp
@@ -2625,22 +2857,34 @@ fun BluetoothConnectivityBadge(
         label = "bt_badge_alpha"
     )
 
-    val badgeColor = when {
-        isConnected -> Color(0xFF10B981) // Emerald Green
-        isConnecting -> HighlightSky // Sky Blue
-        else -> StatusDanger // Muted Red
+    val badgeColor by remember(isConnected, isConnecting) {
+        derivedStateOf {
+            when {
+                isConnected -> Color(0xFF10B981) // Emerald Green
+                isConnecting -> HighlightSky // Sky Blue
+                else -> StatusDanger // Muted Red
+            }
+        }
     }
 
-    val iconVector = when {
-        isConnected -> Icons.Filled.BluetoothConnected
-        isConnecting -> Icons.Filled.BluetoothSearching
-        else -> Icons.Filled.BluetoothDisabled
+    val iconVector by remember(isConnected, isConnecting) {
+        derivedStateOf {
+            when {
+                isConnected -> Icons.Filled.BluetoothConnected
+                isConnecting -> Icons.Filled.BluetoothSearching
+                else -> Icons.Filled.BluetoothDisabled
+            }
+        }
     }
 
-    val labelText = when {
-        isConnected -> "BT: Verbonden"
-        isConnecting -> "BT: Koppelen..."
-        else -> "BT: Offline"
+    val labelText by remember(isConnected, isConnecting) {
+        derivedStateOf {
+            when {
+                isConnected -> "BT: Verbonden"
+                isConnecting -> "BT: Koppelen..."
+                else -> "BT: Offline"
+            }
+        }
     }
 
     Row(
@@ -2874,20 +3118,30 @@ fun BluetoothConnectionStatusIndicator(
         label = "bt_pulse_alpha"
     )
 
-    val dotColor = if (isConnected) Color(0xFF10B981) else Color(0xFF9CA3AF)
-    val statusText = if (isConnected) "Bluetooth Verbonden" else "Niet Verbonden"
+    val dotColor by remember(isConnected) {
+        derivedStateOf { if (isConnected) Color(0xFF10B981) else Color(0xFF9CA3AF) }
+    }
+    val statusText by remember(isConnected) {
+        derivedStateOf { if (isConnected) "Bluetooth Verbonden" else "Niet Verbonden" }
+    }
+    val indicatorBgColor by remember(isConnected) {
+        derivedStateOf { if (isConnected) Color(0xFF10B981).copy(alpha = 0.12f) else DarkCard.copy(alpha = 0.6f) }
+    }
+    val indicatorBorderColor by remember(isConnected) {
+        derivedStateOf { if (isConnected) Color(0xFF10B981).copy(alpha = 0.35f) else DarkBorder }
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
             .background(
-                if (isConnected) Color(0xFF10B981).copy(alpha = 0.12f) else DarkCard.copy(alpha = 0.6f),
+                indicatorBgColor,
                 shape = RoundedCornerShape(20.dp)
             )
             .border(
                 1.dp,
-                if (isConnected) Color(0xFF10B981).copy(alpha = 0.35f) else DarkBorder,
+                indicatorBorderColor,
                 shape = RoundedCornerShape(20.dp)
             )
             .padding(horizontal = 8.dp, vertical = 3.dp)
@@ -3952,6 +4206,12 @@ fun AdvancedAudioEnhancements(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SpatialReverbEngineCard(
+                        viewModel = viewModel,
+                        settings = settings
+                    )
                 }
 
                 HorizontalDivider(color = DarkBorder, thickness = 1.dp)
@@ -4222,8 +4482,20 @@ fun VerticalEqSlider(
 
     val thumbSize by animateDpAsState(
         targetValue = if (isDragging) 22.dp else 18.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "eq_slider_thumb_size"
+    )
+
+    val thumbElevation by animateDpAsState(
+        targetValue = if (isDragging) 8.dp else 2.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioLowBouncy),
+        label = "eq_slider_thumb_elevation"
+    )
+
+    val thumbHaloPadding by animateDpAsState(
+        targetValue = if (isDragging) 6.dp else 0.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioHighBouncy),
+        label = "eq_slider_thumb_halo"
     )
 
     val glowAlpha by animateFloatAsState(
@@ -4286,6 +4558,14 @@ fun VerticalEqSlider(
                 }
         ) {
             val ratio = ((animatedValue - rangeMin) / range).coerceIn(0f, 1f)
+            val thumbOffsetDp by animateDpAsState(
+                targetValue = (122 * ratio).dp,
+                animationSpec = spring(
+                    stiffness = if (isDragging) Spring.StiffnessHigh else Spring.StiffnessMediumLow,
+                    dampingRatio = Spring.DampingRatioMediumBouncy
+                ),
+                label = "eq_slider_thumb_offset"
+            )
 
             // Notch at 0 dB (center of track)
             Box(
@@ -4311,14 +4591,26 @@ fun VerticalEqSlider(
                     )
             )
 
-            // Circle thumb perfectly aligned using padding bottom
+            // Spring-animated halo glow ring during drag
+            if (isDragging || thumbHaloPadding > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = (thumbOffsetDp - thumbHaloPadding / 2).coerceAtLeast(0.dp))
+                        .size(thumbSize + thumbHaloPadding)
+                        .background(color.copy(alpha = glowAlpha), shape = CircleShape)
+                )
+            }
+
+            // Circle thumb knob perfectly aligned with spring physics
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = (122 * ratio).dp) // bounds thumb correctly inside 140dp minus size height
+                    .padding(bottom = thumbOffsetDp)
+                    .shadow(thumbElevation, shape = CircleShape)
                     .size(thumbSize)
                     .background(color, shape = CircleShape)
-                    .border(2.dp, Color.White.copy(alpha = 0.9f), shape = CircleShape)
+                    .border(2.dp, Color.White.copy(alpha = 0.95f), shape = CircleShape)
             )
         }
 
@@ -4915,6 +5207,308 @@ fun BatteryCircularProgressBar(
     }
 }
 
+@Composable
+fun IntelligentBatteryPreservationCard(
+    settings: HeadphoneSettings,
+    viewModel: HeadphoneViewModel,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val isPreservationEnabled = settings.intelligentBatteryPreservationEnabled
+    val isPreservationActive = settings.isBatteryPreservationActive
+    val threshold = settings.intelligentBatteryThreshold
+    val batteryLevel = settings.batteryLevel
+    val pollingIntervalMs = settings.bluetoothPollingIntervalMs
+    val ancCap = settings.batteryPreservationAncCap
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("intelligent_battery_preservation_card"),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPreservationActive) StatusSuccess.copy(alpha = 0.08f) else DarkCard
+        ),
+        border = BorderStroke(
+            width = if (isPreservationActive) 1.5.dp else 1.dp,
+            color = if (isPreservationActive) StatusSuccess else DarkBorder
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                if (isPreservationActive) StatusSuccess.copy(alpha = 0.2f) else AccentPrimary.copy(alpha = 0.15f),
+                                CircleShape
+                            )
+                            .border(
+                                1.dp,
+                                if (isPreservationActive) StatusSuccess else AccentPrimary.copy(alpha = 0.3f),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.BatterySaver,
+                            contentDescription = null,
+                            tint = if (isPreservationActive) StatusSuccess else AccentPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Intelligent Battery Preservation",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Dynamische ANC & Bluetooth Polling Aanpassing",
+                            color = TextMuted,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+
+                Switch(
+                    checked = isPreservationEnabled,
+                    onCheckedChange = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.toggleIntelligentBatteryPreservation(it)
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = StatusSuccess,
+                        uncheckedThumbColor = TextMuted,
+                        uncheckedTrackColor = DarkBg
+                    ),
+                    modifier = Modifier
+                        .scale(0.85f)
+                        .testTag("intelligent_battery_preservation_switch")
+                )
+            }
+
+            HorizontalDivider(color = DarkBorder.copy(alpha = 0.4f))
+
+            // Dynamic Active Banner
+            if (isPreservationActive) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(StatusSuccess.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                        .border(1.dp, StatusSuccess.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ElectricBolt,
+                        contentDescription = null,
+                        tint = StatusSuccess,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "⚡ BESPAARMODUS ACTIEF (Accu ${batteryLevel}% ≤ ${threshold}%)",
+                            color = StatusSuccess,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "ANC dynamisch begrensd op Niveau $ancCap (Eco) • Bluetooth Polling Vertraagd tot 5s (Eco Telemetrie)",
+                            color = TextPrimary,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DarkBg.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                        .border(1.dp, DarkBorder.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPreservationEnabled) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
+                        contentDescription = null,
+                        tint = if (isPreservationEnabled) StatusSuccess else TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = if (isPreservationEnabled) {
+                            "Stand-by: Activeert automatisch zodra batterij ≤ ${threshold}% zakt"
+                        } else {
+                            "Uitgeschakeld: Schakel in voor automatische energiebesparing bij lage acculading"
+                        },
+                        color = TextMuted,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+
+            // Real-time Dynamic Adjustment Parameters Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Parameter 1: ANC Cap Intensity
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(DarkBg, RoundedCornerShape(10.dp))
+                        .border(
+                            1.dp,
+                            if (isPreservationActive) StatusSuccess.copy(alpha = 0.3f) else DarkBorder,
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(10.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.GraphicEq,
+                                contentDescription = null,
+                                tint = HighlightSky,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "ANC Intensiteit Cap",
+                                color = TextMuted,
+                                fontSize = 9.sp
+                            )
+                        }
+                        Text(
+                            text = if (isPreservationActive) "Niveau $ancCap (Eco Capped)" else "Niveau $ancCap Max bij Low Power",
+                            color = if (isPreservationActive) StatusSuccess else TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Parameter 2: Bluetooth Telemetry Polling Rate
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(DarkBg, RoundedCornerShape(10.dp))
+                        .border(
+                            1.dp,
+                            if (isPreservationActive) StatusSuccess.copy(alpha = 0.3f) else DarkBorder,
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(10.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.BluetoothSearching,
+                                contentDescription = null,
+                                tint = AccentPrimary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "BT Polling Rate",
+                                color = TextMuted,
+                                fontSize = 9.sp
+                            )
+                        }
+                        Text(
+                            text = "${pollingIntervalMs}ms (${if (pollingIntervalMs > 2000) "Eco 0.2Hz" else "Normaal 1.0Hz"})",
+                            color = if (pollingIntervalMs > 2000) StatusSuccess else TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Low Power Threshold Selector
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Activeringsdrempel Batterij:",
+                        color = TextPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "≤ $threshold%",
+                        color = AccentPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val thresholdOptions = listOf(15, 20, 25, 30)
+                    thresholdOptions.forEach { option ->
+                        val isSelected = threshold == option
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    color = if (isSelected) AccentPrimary.copy(alpha = 0.2f) else DarkBg,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) AccentPrimary else DarkBorder,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.setIntelligentBatteryThreshold(option)
+                                }
+                                .padding(vertical = 8.dp)
+                                .testTag("preservation_threshold_${option}_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "$option%",
+                                color = if (isSelected) AccentPrimary else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Suppress("DEPRECATION")
 @Composable
 fun VisualBatteryCard(
@@ -4932,7 +5526,9 @@ fun VisualBatteryCard(
     isFetchingBattery: Boolean = false,
     batteryFetchProgress: Float = 0f,
     batteryFetchStatus: String = "",
-    onFetchBattery: () -> Unit = {}
+    onFetchBattery: () -> Unit = {},
+    settings: HeadphoneSettings? = null,
+    viewModel: HeadphoneViewModel? = null
 ) {
     val animatedBatteryLevel by animateFloatAsState(
         targetValue = batteryLevel.toFloat(),
@@ -5256,6 +5852,22 @@ fun VisualBatteryCard(
                         isActive = bassEnabled,
                         drainText = if (bassEnabled) "-4u accuduur" else "Zuinig",
                         isPositive = !bassEnabled
+                    )
+
+                    // Consumer 4: Intelligent Battery Preservation
+                    PowerConsumerRow(
+                        label = "Intelligent Battery Preservation",
+                        icon = Icons.Filled.BatterySaver,
+                        isActive = settings?.isBatteryPreservationActive == true,
+                        drainText = if (settings?.isBatteryPreservationActive == true) "⚡ Actief (ANC Level ${settings.batteryPreservationAncCap} & BT 5s)" else if (settings?.intelligentBatteryPreservationEnabled == true) "Stand-by (≤${settings.intelligentBatteryThreshold}%)" else "Uitgeschakeld",
+                        isPositive = settings?.intelligentBatteryPreservationEnabled == true
+                    )
+                }
+
+                if (settings != null && viewModel != null) {
+                    IntelligentBatteryPreservationCard(
+                        settings = settings,
+                        viewModel = viewModel
                     )
                 }
 
@@ -7374,15 +7986,22 @@ fun HearingHealthCard() {
 fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
     val firmwareVersion by viewModel.firmwareVersion.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val isFirmwarePolling by viewModel.isFirmwarePolling.collectAsStateWithLifecycle()
+    val lastFirmwarePollTime by viewModel.lastFirmwarePollTime.collectAsStateWithLifecycle()
+    val simulatedFirmwareApiUrl by viewModel.simulatedFirmwareApiUrl.collectAsStateWithLifecycle()
+    val simulatedApiHttpStatus by viewModel.simulatedApiHttpStatus.collectAsStateWithLifecycle()
+    val isApiPollingInProgress by viewModel.isApiPollingInProgress.collectAsStateWithLifecycle()
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("firmware_version_card")
             .background(DarkPanel, shape = RoundedCornerShape(12.dp))
             .border(1.dp, DarkBorder, shape = RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Title and Status Badge Row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -7390,49 +8009,149 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.SystemUpdate,
-                        contentDescription = "Firmware",
-                        tint = HighlightSky,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(HighlightSky.copy(alpha = 0.15f), CircleShape)
+                            .border(1.dp, HighlightSky.copy(alpha = 0.4f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.SystemUpdate,
+                            contentDescription = "Firmware Polling Service",
+                            tint = HighlightSky,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     Column {
                         Text(
-                            text = "Firmwarebeheer",
+                            text = "Firmware Update Service",
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
                         Text(
-                            text = "Huidige versie: $firmwareVersion",
+                            text = "Huidige Versie: $firmwareVersion",
                             color = TextMuted,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                // Small badge showing status
+                // Small badge showing version status
                 Box(
                     modifier = Modifier
                         .background(
-                            if (firmwareVersion == "v1.5.0") StatusSuccess.copy(alpha = 0.1f) else StatusYellow.copy(alpha = 0.1f),
+                            if (firmwareVersion == "v1.5.0") StatusSuccess.copy(alpha = 0.1f) else StatusYellow.copy(alpha = 0.15f),
                             RoundedCornerShape(6.dp)
                         )
                         .border(
                             1.dp,
-                            if (firmwareVersion == "v1.5.0") StatusSuccess.copy(alpha = 0.3f) else StatusYellow.copy(alpha = 0.3f),
+                            if (firmwareVersion == "v1.5.0") StatusSuccess.copy(alpha = 0.3f) else StatusYellow.copy(alpha = 0.4f),
                             RoundedCornerShape(6.dp)
                         )
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = if (firmwareVersion == "v1.5.0") "Up-to-date" else "Update beschikbaar",
+                        text = if (firmwareVersion == "v1.5.0") "Up-to-date (v1.5.0)" else "Update beschikbaar",
                         color = if (firmwareVersion == "v1.5.0") StatusSuccess else StatusYellow,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+            }
+
+            // Simulated API Endpoint Polling Information Panel
+            Surface(
+                color = DarkBg,
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, DarkBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(
+                                        if (isApiPollingInProgress) StatusYellow else if (isFirmwarePolling) StatusSuccess else TextMuted,
+                                        CircleShape
+                                    )
+                            )
+                            Text(
+                                text = "Simulated OTA API Endpoint",
+                                color = TextPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text(
+                            text = "HTTP $simulatedApiHttpStatus OK",
+                            color = StatusSuccess,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+
+                    Text(
+                        text = simulatedFirmwareApiUrl,
+                        color = HighlightSky,
+                        fontSize = 9.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        maxLines = 1
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Laatste Poll: ${lastFirmwarePollTime ?: "Bezig..."}",
+                            color = TextMuted,
+                            fontSize = 10.sp
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Auto-Polling (30s)",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                            Switch(
+                                checked = isFirmwarePolling,
+                                onCheckedChange = { viewModel.toggleFirmwarePolling(it) },
+                                modifier = Modifier
+                                    .scale(0.7f)
+                                    .testTag("firmware_polling_switch"),
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = HighlightSky,
+                                    uncheckedThumbColor = TextMuted,
+                                    uncheckedTrackColor = DarkBorder
+                                )
+                            )
+                        }
+                    }
                 }
             }
 
@@ -7441,7 +8160,7 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
             when (val state = updateState) {
                 is UpdateState.Idle -> {
                     Text(
-                        text = "Houd je Philips TAH6519 up-to-date met de nieuwste audio-algoritmen en Bluetooth-stabiliteitsverbeteringen.",
+                        text = "De periodieke polling-service controleert de Philips OTA-server op nieuwe versies voor de TAH6519.",
                         color = TextMuted,
                         fontSize = 11.sp,
                         lineHeight = 15.sp
@@ -7456,12 +8175,23 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                             .height(38.dp)
                             .testTag("btn_check_firmware_updates")
                     ) {
-                        Text(
-                            text = "Controleer op updates",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Nu Controleren via API",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
 
@@ -7477,7 +8207,7 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                             strokeWidth = 2.5.dp
                         )
                         Text(
-                            text = "Zoeken naar firmware-updates...",
+                            text = "Aanvraag verzenden naar Philips OTA API...",
                             color = TextMuted,
                             fontSize = 11.sp
                         )
@@ -7504,7 +8234,7 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = "Je Philips TAH6519 beschikt over de nieuwste firmware ($firmwareVersion).",
+                                text = "Je Philips TAH6519 heeft de nieuwste firmware ($firmwareVersion).",
                                 color = StatusSuccess,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -7512,14 +8242,15 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                         }
 
                         Button(
-                            onClick = { viewModel.resetUpdateState() },
+                            onClick = { viewModel.pollFirmwareApi(manual = true) },
                             colors = ButtonDefaults.buttonColors(containerColor = DarkBorder),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(36.dp)
+                                .testTag("btn_recheck_firmware")
                         ) {
-                            Text(text = "Sluiten", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Opnieuw Controleren", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -7531,22 +8262,29 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(StatusYellow.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                                .border(1.dp, StatusYellow.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                .background(StatusYellow.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .border(1.dp, StatusYellow.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                                 .padding(10.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Info,
-                                contentDescription = "Update available",
+                                contentDescription = "Update beschikbaar",
                                 tint = StatusYellow,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Text(
-                                text = "Nieuwe versie beschikbaar: ${state.version}",
-                                color = StatusYellow,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Column {
+                                Text(
+                                    text = "Nieuwe Firmware Gedetecteerd: ${state.version}",
+                                    color = StatusYellow,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Huidige versie $firmwareVersion ➔ Nieuwe versie ${state.version}",
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
+                            }
                         }
 
                         // Changelog details
@@ -7559,19 +8297,25 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    text = "WAT IS ER NIEUW IN ${state.version}:",
+                                    text = "NIEUW IN VERSIE ${state.version}:",
                                     color = HighlightSky,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.sp
                                 )
                                 state.changelog.forEach { bullet ->
-                                    Text(
-                                        text = bullet,
-                                        color = TextMuted,
-                                        fontSize = 10.sp,
-                                        lineHeight = 14.sp
-                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Text("•", color = HighlightSky, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = bullet,
+                                            color = TextMuted,
+                                            fontSize = 10.sp,
+                                            lineHeight = 14.sp
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -7591,11 +8335,33 @@ fun FirmwareVersionCard(viewModel: HeadphoneViewModel) {
                             }
                             Button(
                                 onClick = { viewModel.startUpdate() },
-                                colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = HighlightSky,
+                                    contentColor = Color.Black
+                                ),
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1.5f).testTag("btn_install_firmware_update")
+                                modifier = Modifier
+                                    .weight(1.6f)
+                                    .height(40.dp)
+                                    .testTag("btn_install_firmware_update")
                             ) {
-                                Text("Nu installeren", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Download,
+                                        contentDescription = null,
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "UPDATE NU",
+                                        color = Color.Black,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
                             }
                         }
                     }
@@ -8519,7 +9285,7 @@ fun DashboardSoundSafetyMeter(viewModel: HeadphoneViewModel) {
                                 ambientDecibel < 80 -> "Luidruchtig"
                                 else -> "Risicovol!"
                             }
-                            String.format("%.1f dBA (%s)", ambientDecibel, category)
+                            "${ambientDecibel} dBA ($category)"
                         } else {
                             "Klik om te meten"
                         },
@@ -9557,6 +10323,42 @@ fun BluetoothStatusIndicatorCard(
     val scannedDevices by viewModel.scannedDevices.collectAsStateWithLifecycle()
     val isSimulationMode by viewModel.isSimulationMode.collectAsStateWithLifecycle()
 
+    val statusTitle by remember(settings.connected, isAutoReconnecting, isConnecting, settings.connectedDeviceName, settings.headphoneCategory) {
+        derivedStateOf {
+            if (settings.connected) "${settings.connectedDeviceName} (${settings.headphoneCategory})"
+            else if (isAutoReconnecting) "Verbinding herstellen..."
+            else if (isConnecting) "Verbinding maken..."
+            else "Koptelefoon stand-by"
+        }
+    }
+    val statusSubtitle by remember(settings.connected, isAutoReconnecting, isConnecting, reconnectAttempts) {
+        derivedStateOf {
+            if (settings.connected) "Signaal: Uitstekend (-52 dBm) · Multipoint"
+            else if (isAutoReconnecting) "Spoorloos verloren. Automatische poging $reconnectAttempts van 3..."
+            else if (isConnecting) "Koppelen via Bluetooth LE..."
+            else "Schakel de koptelefoon in om verbinding te maken"
+        }
+    }
+    val statusIcon by remember(settings.connected, isAutoReconnecting, isConnecting) {
+        derivedStateOf {
+            if (settings.connected) Icons.Filled.Bluetooth
+            else if (isAutoReconnecting) Icons.Filled.Sync
+            else if (isConnecting) Icons.Filled.Bluetooth
+            else Icons.Filled.BluetoothDisabled
+        }
+    }
+    val statusIconTint by remember(settings.connected, isAutoReconnecting, isConnecting) {
+        derivedStateOf {
+            if (settings.connected) StatusSuccess
+            else if (isAutoReconnecting) StatusPurple
+            else if (isConnecting) StatusYellow
+            else TextMuted
+        }
+    }
+    val batteryTextFormatted by remember(settings.batteryLevel) {
+        derivedStateOf { "${settings.batteryLevel}%" }
+    }
+
     // Pulse animation for the glowing ring
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_bluetooth")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -9739,15 +10541,9 @@ fun BluetoothStatusIndicatorCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (settings.connected) Icons.Filled.Bluetooth
-                                         else if (isAutoReconnecting) Icons.Filled.Sync
-                                         else if (isConnecting) Icons.Filled.Bluetooth
-                                         else Icons.Filled.BluetoothDisabled,
+                            imageVector = statusIcon,
                             contentDescription = null,
-                            tint = if (settings.connected) StatusSuccess
-                                   else if (isAutoReconnecting) StatusPurple
-                                   else if (isConnecting) StatusYellow
-                                   else TextMuted,
+                            tint = statusIconTint,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -9759,20 +10555,14 @@ fun BluetoothStatusIndicatorCard(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = if (settings.connected) "${settings.connectedDeviceName} (${settings.headphoneCategory})" 
-                               else if (isAutoReconnecting) "Verbinding herstellen..." 
-                               else if (isConnecting) "Verbinding maken..." 
-                               else "Koptelefoon stand-by",
+                        text = statusTitle,
                         color = TextPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     
                     Text(
-                        text = if (settings.connected) "Signaal: Uitstekend (-52 dBm) · Multipoint"
-                               else if (isAutoReconnecting) "Spoorloos verloren. Automatische poging ${reconnectAttempts} van 3..."
-                               else if (isConnecting) "Koppelen via Bluetooth LE..."
-                               else "Schakel de koptelefoon in om verbinding te maken",
+                        text = statusSubtitle,
                         color = if (isAutoReconnecting) StatusPurple else TextMuted,
                         fontSize = 11.sp
                     )
@@ -9804,7 +10594,7 @@ fun BluetoothStatusIndicatorCard(
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
-                            text = "Accu: ${settings.batteryLevel}%",
+                            text = "Accu: $batteryTextFormatted",
                             color = TextPrimary,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
@@ -9990,6 +10780,188 @@ fun BluetoothStatusIndicatorCard(
             // Scanned Devices List for Bluetooth Connection Management
             if (!settings.connected && (isScanning || scannedDevices.isNotEmpty())) {
                 HorizontalDivider(color = DarkBorder.copy(alpha = 0.3f))
+                
+                // Prominent Philips TAH6519 Detected Connection Prompt Card
+                val detectedTah6519 = scannedDevices.firstOrNull {
+                    it.name.contains("TAH6519", ignoreCase = true) || it.name.contains("Philips", ignoreCase = true)
+                }
+                
+                if (detectedTah6519 != null) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("tah6519_connection_prompt_card"),
+                        colors = CardDefaults.cardColors(containerColor = DarkCard),
+                        border = BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(HighlightSky, StatusPurple))),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(HighlightSky.copy(alpha = 0.2f), CircleShape)
+                                            .border(1.dp, HighlightSky, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Headphones,
+                                            contentDescription = "Philips TAH6519 Detected",
+                                            tint = HighlightSky,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = detectedTah6519.name,
+                                                color = TextPrimary,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                            Surface(
+                                                color = HighlightSky.copy(alpha = 0.25f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "GEVONDEN",
+                                                    color = HighlightSky,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = "Signaal: ${detectedTah6519.rssi} dBm • Direct koppelen beschikbaar",
+                                            color = TextMuted,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                                
+                                Text(
+                                    text = detectedTah6519.address,
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                            }
+                            
+                            // Feature tags
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Surface(
+                                    color = DarkBg,
+                                    border = BorderStroke(0.5.dp, DarkBorder),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "40mm Neodynium Drivers",
+                                        color = TextPrimary,
+                                        fontSize = 9.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    )
+                                }
+                                Surface(
+                                    color = DarkBg,
+                                    border = BorderStroke(0.5.dp, DarkBorder),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Hybrid ANC Deep Silence",
+                                        color = StatusPurple,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    )
+                                }
+                                Surface(
+                                    color = DarkBg,
+                                    border = BorderStroke(0.5.dp, DarkBorder),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "LDAC Hi-Res",
+                                        color = HighlightSky,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                            
+                            // Connect Button
+                            Button(
+                                onClick = { viewModel.connectDevice(detectedTah6519.address) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = HighlightSky,
+                                    contentColor = Color.Black
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(38.dp)
+                                    .testTag("tah6519_prompt_connect_button"),
+                                enabled = !isConnecting
+                            ) {
+                                if (isConnecting) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            color = Color.Black,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Text(
+                                            text = "Verbinding maken...",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                } else {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.BluetoothConnected,
+                                            contentDescription = null,
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "⚡ Direct Koppelen & Verbinden met TAH6519",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
@@ -12482,8 +13454,28 @@ fun Tah6519HeadphoneBatteryArt(
     ancMode: String = "ON"
 ) {
     // Left channel level is slightly different for realistic asymmetry
-    val leftLevel = (batteryLevel - 3).coerceIn(0, 100)
-    val rightLevel = (batteryLevel + 2).coerceIn(0, 100)
+    val leftLevel by remember(batteryLevel) {
+        derivedStateOf { (batteryLevel - 3).coerceIn(0, 100) }
+    }
+    val rightLevel by remember(batteryLevel) {
+        derivedStateOf { (batteryLevel + 2).coerceIn(0, 100) }
+    }
+
+    val normalBrushColor by remember(batteryLevel) {
+        derivedStateOf {
+            when {
+                batteryLevel <= 20 -> StatusDanger
+                batteryLevel <= 50 -> StatusYellow
+                else -> AccentPrimary
+            }
+        }
+    }
+
+    val activeColor by remember(batteryLevel, isCharging) {
+        derivedStateOf {
+            if (isCharging) HighlightSky else normalBrushColor
+        }
+    }
 
     val animatedLeftLevel by animateFloatAsState(
         targetValue = leftLevel.toFloat(),
@@ -12559,14 +13551,6 @@ fun Tah6519HeadphoneBatteryArt(
             val rightCupX = centerX + earcupOffset
             val cupY = centerY
 
-            // Colors
-            val normalBrushColor = when {
-                batteryLevel <= 20 -> StatusDanger
-                batteryLevel <= 50 -> StatusYellow
-                else -> AccentPrimary
-            }
-            
-            val activeColor = if (isCharging) HighlightSky else normalBrushColor
             val ghostColor = activeColor.copy(alpha = 0.15f)
 
             // 1. Draw Connection / Energy Glow Halos around Earcups
@@ -12890,6 +13874,19 @@ fun PhilipsPremiumBatteryIndicator(
     isCharging: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val batteryTextFormatted by remember(batteryLevel) {
+        derivedStateOf { "$batteryLevel%" }
+    }
+    val batteryStatusLabel by remember(isCharging) {
+        derivedStateOf { if (isCharging) "OPLADEN" else "RESTEREND" }
+    }
+    val leftChannelLevel by remember(batteryLevel) {
+        derivedStateOf { (batteryLevel - 3).coerceIn(0, 100) }
+    }
+    val rightChannelLevel by remember(batteryLevel) {
+        derivedStateOf { (batteryLevel + 2).coerceIn(0, 100) }
+    }
+
     val animatedLevel by animateFloatAsState(
         targetValue = batteryLevel.toFloat(),
         animationSpec = tween(1000, easing = FastOutSlowInEasing),
@@ -12931,7 +13928,7 @@ fun PhilipsPremiumBatteryIndicator(
         EarcupBatteryIndicator(
             label = "L KANAAL",
             channel = "L",
-            level = (batteryLevel - 3).coerceIn(0, 100),
+            level = leftChannelLevel,
             isCharging = isCharging,
             glowAlpha = if (isCharging) glowAlpha else 1f
         )
@@ -13024,7 +14021,7 @@ fun PhilipsPremiumBatteryIndicator(
                 }
                 
                 Text(
-                    text = "${batteryLevel}%",
+                    text = batteryTextFormatted,
                     color = Color.White,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
@@ -13033,7 +14030,7 @@ fun PhilipsPremiumBatteryIndicator(
                 )
 
                 Text(
-                    text = if (isCharging) "OPLADEN" else "RESTEREND",
+                    text = batteryStatusLabel,
                     color = if (isCharging) HighlightSky else TextMuted,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
@@ -13046,7 +14043,7 @@ fun PhilipsPremiumBatteryIndicator(
         EarcupBatteryIndicator(
             label = "R KANAAL",
             channel = "R",
-            level = (batteryLevel + 2).coerceIn(0, 100),
+            level = rightChannelLevel,
             isCharging = isCharging,
             glowAlpha = if (isCharging) glowAlpha else 1f
         )
@@ -13060,6 +14057,10 @@ fun PhilipsHeadphoneProgressBar(
     healthModeActive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val batteryTextLabel by remember(batteryLevel) {
+        derivedStateOf { "$batteryLevel%" }
+    }
+
     val animatedLevel by animateFloatAsState(
         targetValue = batteryLevel.toFloat(),
         animationSpec = tween(1000, easing = FastOutSlowInEasing),
@@ -13138,7 +14139,7 @@ fun PhilipsHeadphoneProgressBar(
                     )
                 }
                 Text(
-                    text = "${batteryLevel}%",
+                    text = batteryTextLabel,
                     color = if (isCharging) HighlightSky else TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Black
@@ -13602,9 +14603,11 @@ fun SettingsDialog(
                     }
                 }
 
-                // Theme Mode Card
+                // Applicatiethema & Persistent Voorkeur (DataStore)
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_theme_card"),
                     colors = CardDefaults.cardColors(containerColor = DarkCard),
                     border = BorderStroke(1.dp, DarkBorder),
                     shape = RoundedCornerShape(12.dp)
@@ -13613,7 +14616,7 @@ fun SettingsDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -13625,13 +14628,13 @@ fun SettingsDialog(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (ThemeState.isLightMode) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
+                                    imageVector = Icons.Filled.BrightnessAuto,
                                     contentDescription = null,
                                     tint = HighlightSky,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    text = "Applicatiethema",
+                                    text = "Voorkeur UI-Thema",
                                     color = TextPrimary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
@@ -13640,29 +14643,85 @@ fun SettingsDialog(
                             
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier
+                                    .background(StatusSuccess.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp))
+                                    .border(1.dp, StatusSuccess.copy(alpha = 0.3f), shape = RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = StatusSuccess,
+                                    modifier = Modifier.size(10.dp)
+                                )
                                 Text(
-                                    text = if (ThemeState.isLightMode) "Lichte Modus" else "Donkere Modus",
-                                    color = TextMuted,
-                                    fontSize = 11.sp
+                                    text = "DataStore Persisted",
+                                    color = StatusSuccess,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
-                                Switch(
-                                    checked = ThemeState.isLightMode,
-                                    onCheckedChange = { 
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        ThemeState.isLightMode = it 
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = HighlightSky,
-                                        uncheckedThumbColor = TextMuted,
-                                        uncheckedTrackColor = DarkBg
-                                    ),
+                            }
+                        }
+
+                        // 3-way Theme Mode Segmented Selector (System / Dark / Light)
+                        val currentMode by viewModel.currentThemeMode.collectAsStateWithLifecycle()
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(DarkBg, shape = RoundedCornerShape(10.dp))
+                                .border(1.dp, DarkBorder, shape = RoundedCornerShape(10.dp))
+                                .padding(3.dp)
+                                .testTag("settings_theme_mode_selector"),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val modeOptions = listOf(
+                                Triple(com.example.ui.theme.ThemeMode.SYSTEM, "Systeem", Icons.Filled.BrightnessAuto),
+                                Triple(com.example.ui.theme.ThemeMode.DARK, "Donker", Icons.Filled.NightsStay),
+                                Triple(com.example.ui.theme.ThemeMode.LIGHT, "Licht", Icons.Filled.WbSunny)
+                            )
+
+                            modeOptions.forEach { (mode, label, icon) ->
+                                val isSelected = currentMode == mode
+                                Box(
                                     modifier = Modifier
-                                        .scale(0.75f)
-                                        .testTag("settings_theme_switch")
-                                )
+                                        .weight(1f)
+                                        .background(
+                                            color = if (isSelected) HighlightSky.copy(alpha = 0.2f) else Color.Transparent,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .border(
+                                            width = if (isSelected) 1.dp else 0.dp,
+                                            color = if (isSelected) HighlightSky else Color.Transparent,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            viewModel.setThemeMode(mode)
+                                        }
+                                        .padding(vertical = 8.dp)
+                                        .testTag("theme_mode_${mode.name.lowercase()}_button"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (isSelected) HighlightSky else TextMuted,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) TextPrimary else TextMuted,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -13703,9 +14762,10 @@ fun SettingsDialog(
                                         )
                                         .clickable {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            ThemeState.activeTheme = theme
+                                            viewModel.setActiveAppTheme(theme)
                                         }
-                                        .padding(vertical = 10.dp),
+                                        .padding(vertical = 10.dp)
+                                        .testTag("app_theme_${label.lowercase()}_button"),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(
@@ -13729,6 +14789,12 @@ fun SettingsDialog(
                         }
                     }
                 }
+
+                // Intelligent Battery Preservation Card
+                IntelligentBatteryPreservationCard(
+                    settings = settings,
+                    viewModel = viewModel
+                )
 
                 // Philips TAH6519 Device Info & Firmware Card
                 Card(
@@ -13926,6 +14992,13 @@ fun SettingsDialog(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Tah6519HardwareSpecsCard(
+                    settings = settings,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 HorizontalDivider(color = DarkBorder)
 
                 // Factory Reset Section
@@ -14024,6 +15097,857 @@ fun SpatialAudioVisualizer() {
                 isAntiAlias = true
             }
             drawText("3D SPATIAL AUDIO ACTIEF", w / 2f, h - 10.dp.toPx(), paint)
+        }
+    }
+}
+
+@Composable
+fun SpatialReverbEngineCard(
+    viewModel: HeadphoneViewModel,
+    settings: com.example.data.HeadphoneSettings,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+
+    // State parameters for spatial reverb
+    var activeMode by remember { mutableStateOf(settings.spatialAudioMode) }
+    var roomSize by remember { mutableFloatStateOf(65f) } // 10% - 100%
+    var reverbDecay by remember { mutableFloatStateOf(1.8f) } // 0.5s - 5.0s
+    var wetDryMix by remember { mutableFloatStateOf(40f) } // 0% - 100%
+    var spatialWidth by remember { mutableFloatStateOf(80f) } // 0% - 100%
+
+    // Smooth animated transitions for sliders when values change
+    val animatedRoomSize by animateFloatAsState(
+        targetValue = roomSize,
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "anim_room_size"
+    )
+    val animatedReverbDecay by animateFloatAsState(
+        targetValue = reverbDecay,
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "anim_reverb_decay"
+    )
+    val animatedWetDry by animateFloatAsState(
+        targetValue = wetDryMix,
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "anim_wet_dry"
+    )
+    val animatedSpatialWidth by animateFloatAsState(
+        targetValue = spatialWidth,
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "anim_spatial_width"
+    )
+
+    // updateTransition for acoustic mode changes
+    val modeTransition = updateTransition(targetState = activeMode, label = "spatial_reverb_mode_transition")
+
+    val auraColor by modeTransition.animateColor(
+        transitionSpec = { tween(durationMillis = 400, easing = FastOutSlowInEasing) },
+        label = "aura_color"
+    ) { mode ->
+        when (mode) {
+            "Stereo" -> Color(0xFF708090)
+            "Acoustic Studio" -> HighlightSky
+            "Live Concert" -> StatusPurple
+            "Cinematic 3D" -> Color(0xFF00E5FF)
+            else -> StatusPurple
+        }
+    }
+
+    val roomScaleFactor by modeTransition.animateFloat(
+        transitionSpec = { spring(stiffness = Spring.StiffnessLow) },
+        label = "room_scale"
+    ) { mode ->
+        when (mode) {
+            "Stereo" -> 0.75f
+            "Acoustic Studio" -> 1.0f
+            "Live Concert" -> 1.35f
+            "Cinematic 3D" -> 1.65f
+            else -> 1.0f
+        }
+    }
+
+    val echoRingDensity by modeTransition.animateFloat(
+        transitionSpec = { tween(durationMillis = 350) },
+        label = "echo_density"
+    ) { mode ->
+        when (mode) {
+            "Stereo" -> 0.2f
+            "Acoustic Studio" -> 0.6f
+            "Live Concert" -> 0.85f
+            "Cinematic 3D" -> 1.0f
+            else -> 0.6f
+        }
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("spatial_reverb_engine_card"),
+        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        border = BorderStroke(
+            1.dp,
+            Brush.horizontalGradient(
+                colors = listOf(
+                    DarkBorder,
+                    auraColor.copy(alpha = 0.5f),
+                    DarkBorder
+                )
+            )
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(auraColor.copy(alpha = 0.2f), CircleShape)
+                            .border(1.dp, auraColor.copy(alpha = 0.6f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.GraphicEq,
+                            contentDescription = "Spatial Reverb Engine",
+                            tint = auraColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Spatial Reverb & Acoustic Engine",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Acoustic Stage Virtualization & Reverb Tail Tuning",
+                            color = TextMuted,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+
+                // Active Mode Badge
+                Box(
+                    modifier = Modifier
+                        .background(auraColor.copy(alpha = 0.15f), shape = RoundedCornerShape(20.dp))
+                        .border(1.dp, auraColor.copy(alpha = 0.5f), shape = RoundedCornerShape(20.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = activeMode.uppercase(),
+                        color = auraColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Interactive Dynamic Canvas Soundstage Visualizer
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(130.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(DarkBg)
+                    .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+            ) {
+                val infinitePulse = rememberInfiniteTransition(label = "reverb_pulse")
+                val pulsePhase by infinitePulse.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 2f * Math.PI.toFloat(),
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2800, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "pulse_phase"
+                )
+
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("spatial_reverb_canvas")
+                ) {
+                    val w = size.width
+                    val h = size.height
+                    val center = Offset(w / 2f, h / 2f)
+
+                    // Draw acoustic room boundaries scaled by animatedRoomSize & roomScaleFactor
+                    val baseRoomWidth = (w * 0.45f) * (animatedRoomSize / 100f) * roomScaleFactor
+                    val baseRoomHeight = (h * 0.42f) * (animatedRoomSize / 100f) * roomScaleFactor
+                    val roomRect = androidx.compose.ui.geometry.Rect(
+                        center.x - baseRoomWidth,
+                        center.y - baseRoomHeight,
+                        center.x + baseRoomWidth,
+                        center.y + baseRoomHeight
+                    )
+
+                    drawRoundRect(
+                        color = auraColor.copy(alpha = 0.25f),
+                        topLeft = Offset(roomRect.left, roomRect.top),
+                        size = androidx.compose.ui.geometry.Size(roomRect.width, roomRect.height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()),
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+
+                    // Draw Binaural Listener Head at Center
+                    drawCircle(
+                        color = TextPrimary,
+                        radius = 12.dp.toPx(),
+                        center = center
+                    )
+                    drawCircle(
+                        color = auraColor,
+                        radius = 6.dp.toPx(),
+                        center = center
+                    )
+
+                    // Draw Stereo Speakers & Binaural Spread Arcs
+                    val spreadPx = (w * 0.35f) * (animatedSpatialWidth / 100f)
+                    val leftSpeaker = Offset((center.x - spreadPx).coerceAtLeast(16.dp.toPx()), center.y - 10.dp.toPx())
+                    val rightSpeaker = Offset((center.x + spreadPx).coerceAtMost(w - 16.dp.toPx()), center.y - 10.dp.toPx())
+
+                    // Left/Right Speaker nodes
+                    drawCircle(color = auraColor, radius = 5.dp.toPx(), center = leftSpeaker)
+                    drawCircle(color = auraColor, radius = 5.dp.toPx(), center = rightSpeaker)
+
+                    // Speaker sound vectors to head
+                    drawLine(
+                        color = auraColor.copy(alpha = 0.4f),
+                        start = leftSpeaker,
+                        end = center,
+                        strokeWidth = 1.dp.toPx()
+                    )
+                    drawLine(
+                        color = auraColor.copy(alpha = 0.4f),
+                        start = rightSpeaker,
+                        end = center,
+                        strokeWidth = 1.dp.toPx()
+                    )
+
+                    // Radiating Acoustic Reverb Reflection Waves driven by animatedReverbDecay & animatedWetDry
+                    val ringCount = (3 * echoRingDensity).toInt().coerceAtLeast(1)
+                    val maxRadius = (baseRoomWidth.coerceAtLeast(baseRoomHeight))
+                    for (i in 0 until ringCount) {
+                        val phaseOffset = (pulsePhase + (i * Math.PI.toFloat() / ringCount)) % (2f * Math.PI.toFloat())
+                        val progress = phaseOffset / (2f * Math.PI.toFloat())
+                        val waveRadius = 14.dp.toPx() + progress * maxRadius * (animatedReverbDecay / 2.5f)
+                        val waveAlpha = ((1f - progress) * (animatedWetDry / 100f) * 0.7f).coerceIn(0f, 1f)
+
+                        drawCircle(
+                            color = auraColor.copy(alpha = waveAlpha),
+                            radius = waveRadius,
+                            center = center,
+                            style = Stroke(width = (2.dp.toPx() * (1f - progress)).coerceAtLeast(0.5.dp.toPx()))
+                        )
+                    }
+
+                    // Native Canvas Text Label displaying animated readouts
+                    drawContext.canvas.nativeCanvas.apply {
+                        val paint = android.graphics.Paint().apply {
+                            color = android.graphics.Color.argb(
+                                (255 * 0.8f).toInt(),
+                                (auraColor.red * 255).toInt(),
+                                (auraColor.green * 255).toInt(),
+                                (auraColor.blue * 255).toInt()
+                            )
+                            textSize = 9.sp.toPx()
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                        }
+                        drawText(
+                            "STAGE: ${activeMode.uppercase()} · ${"%.1f".format(animatedReverbDecay)}s DECAY · ${animatedWetDry.toInt()}% WET",
+                            w / 2f,
+                            h - 8.dp.toPx(),
+                            paint
+                        )
+                    }
+                }
+            }
+
+            // Mode Selector Preset Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val modes = listOf("Stereo", "Acoustic Studio", "Live Concert", "Cinematic 3D")
+                modes.forEach { mode ->
+                    val isSelected = activeMode == mode
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            activeMode = mode
+                            viewModel.setSpatialAudioMode(mode)
+                            when (mode) {
+                                "Stereo" -> {
+                                    roomSize = 25f
+                                    reverbDecay = 0.8f
+                                    wetDryMix = 15f
+                                    spatialWidth = 40f
+                                }
+                                "Acoustic Studio" -> {
+                                    roomSize = 50f
+                                    reverbDecay = 1.4f
+                                    wetDryMix = 35f
+                                    spatialWidth = 70f
+                                }
+                                "Live Concert" -> {
+                                    roomSize = 80f
+                                    reverbDecay = 2.8f
+                                    wetDryMix = 60f
+                                    spatialWidth = 90f
+                                }
+                                "Cinematic 3D" -> {
+                                    roomSize = 95f
+                                    reverbDecay = 3.6f
+                                    wetDryMix = 75f
+                                    spatialWidth = 100f
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp)
+                            .testTag("reverb_mode_button_$mode"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) auraColor.copy(alpha = 0.2f) else DarkPanel,
+                            contentColor = if (isSelected) auraColor else TextMuted
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) auraColor else DarkBorder
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = when (mode) {
+                                "Stereo" -> "Dry Direct"
+                                "Acoustic Studio" -> "Studio"
+                                "Live Concert" -> "Concert"
+                                else -> "Cinema 3D"
+                            },
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = DarkBorder, thickness = 1.dp)
+
+            // Sliders Section
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Slider 1: Acoustic Room Size
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Acoustic Room Size",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${animatedRoomSize.toInt()}%",
+                            color = auraColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    PremiumSlider(
+                        value = roomSize,
+                        onValueChange = {
+                            if (Math.abs(it - roomSize) > 2f) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            roomSize = it
+                        },
+                        valueRange = 10f..100f,
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = auraColor,
+                            inactiveTrackColor = DarkBorder,
+                            thumbColor = auraColor
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("reverb_room_size_slider")
+                    )
+                }
+
+                // Slider 2: Reverb Decay Time
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Reverb Decay Time (RT60)",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${"%.1f".format(animatedReverbDecay)} s",
+                            color = auraColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    PremiumSlider(
+                        value = reverbDecay,
+                        onValueChange = {
+                            if (Math.abs(it - reverbDecay) > 0.15f) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            reverbDecay = it
+                        },
+                        valueRange = 0.5f..5.0f,
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = auraColor,
+                            inactiveTrackColor = DarkBorder,
+                            thumbColor = auraColor
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("reverb_decay_slider")
+                    )
+                }
+
+                // Slider 3: Wet / Dry Mix
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Acoustic Wet / Dry Mix",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${animatedWetDry.toInt()}% Wet",
+                            color = auraColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    PremiumSlider(
+                        value = wetDryMix,
+                        onValueChange = {
+                            if (Math.abs(it - wetDryMix) > 2f) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            wetDryMix = it
+                        },
+                        valueRange = 0f..100f,
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = auraColor,
+                            inactiveTrackColor = DarkBorder,
+                            thumbColor = auraColor
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("reverb_wet_dry_slider")
+                    )
+                }
+
+                // Slider 4: 3D Stereo Spread Width
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "3D Spatial Soundstage Width",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${animatedSpatialWidth.toInt()}% Wide",
+                            color = auraColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    PremiumSlider(
+                        value = spatialWidth,
+                        onValueChange = {
+                            if (Math.abs(it - spatialWidth) > 2f) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            spatialWidth = it
+                        },
+                        valueRange = 0f..100f,
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = auraColor,
+                            inactiveTrackColor = DarkBorder,
+                            thumbColor = auraColor
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("spatial_width_slider")
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun Tah6519HardwareSpecsCard(
+    settings: com.example.data.HeadphoneSettings,
+    modifier: Modifier = Modifier
+) {
+    var expandedSpecs by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("tah6519_hardware_specs_card"),
+        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        border = BorderStroke(1.dp, HighlightSky.copy(alpha = 0.35f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(HighlightSky.copy(alpha = 0.15f), CircleShape)
+                            .border(1.dp, HighlightSky.copy(alpha = 0.4f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Memory,
+                            contentDescription = "Hardware Specs",
+                            tint = HighlightSky,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Philips TAH6519 Specs & Telemetrie",
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "40mm Neodymium • Hybrid ANC • LDAC 990kbps",
+                            color = TextMuted,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = { expandedSpecs = !expandedSpecs },
+                    modifier = Modifier.size(32.dp).testTag("toggle_hardware_specs_btn")
+                ) {
+                    Icon(
+                        imageVector = if (expandedSpecs) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = "Expand Specs",
+                        tint = HighlightSky
+                    )
+                }
+            }
+
+            HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+
+            // Highlighted Live Telemetry Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Metric 1: Driver Specs
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(DarkBg, shape = RoundedCornerShape(10.dp))
+                        .border(1.dp, DarkBorder, shape = RoundedCornerShape(10.dp))
+                        .padding(8.dp)
+                ) {
+                    Column {
+                        Text("AKOESTIEK", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text("40mm Neo", color = HighlightSky, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("7Hz - 40kHz", color = TextMuted, fontSize = 10.sp)
+                    }
+                }
+
+                // Metric 2: Battery Life
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(DarkBg, shape = RoundedCornerShape(10.dp))
+                        .border(1.dp, DarkBorder, shape = RoundedCornerShape(10.dp))
+                        .padding(8.dp)
+                ) {
+                    Column {
+                        Text("ACCU DUUR", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text(if (settings.ancMode != "OFF") "40 uur" else "80 uur", color = StatusSuccess, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Snelladen 15m=5h", color = TextMuted, fontSize = 10.sp)
+                    }
+                }
+
+                // Metric 3: ANC Attenuation
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(DarkBg, shape = RoundedCornerShape(10.dp))
+                        .border(1.dp, DarkBorder, shape = RoundedCornerShape(10.dp))
+                        .padding(8.dp)
+                ) {
+                    Column {
+                        Text("ANC REDUCTIE", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text("-38 dB", color = AccentPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Quad-Mic Hybrid", color = TextMuted, fontSize = 10.sp)
+                    }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = expandedSpecs,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+
+                    Text("Gedetailleerde Technische Specificaties:", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+
+                    val specs = listOf(
+                        "Bluetooth Versie" to "Bluetooth 5.3 met Multipoint Dual Sync",
+                        "Audio Codec Support" to "LDAC (24-bit/96kHz), AAC, SBC",
+                        "Transducer Formaat" to "40mm High-Performance Neodymium",
+                        "Impedantie / Gevoeligheid" to "32 Ohm / 102 dB/mW (1kHz)",
+                        "Microfoon Systeem" to "4x ruisonderdrukkende MEMS met Aura Voice",
+                        "Snel-laad Technologie" to "USB-C (15 min laden = 5 uur luisteren)",
+                        "Lage Latency Modus" to "45 ms (Audio / Video Sync)",
+                        "Hardware Gewicht" to "245 gram (Ergonomische Memory Foam)"
+                    )
+
+                    specs.forEach { (label, value) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(label, color = TextMuted, fontSize = 11.sp)
+                            Text(value, color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun Tah6519EstimatedBatteryBanner(
+    settings: com.example.data.HeadphoneSettings,
+    isCharging: Boolean,
+    onNavigateToBattery: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val batteryLevel = settings.batteryLevel
+    val ancMode = settings.ancMode
+    val ldacEnabled = settings.ldacEnabled
+
+    val baseMaxHours = if (ancMode != "OFF") 40f else 80f
+    val codecFactor = if (ldacEnabled) 0.75f else 1.0f
+    val maxHours = baseMaxHours * codecFactor
+    val estHours = if (batteryLevel == 0) 0 else ((batteryLevel / 100f) * maxHours).toInt()
+
+    val animatedBatteryLevel by animateFloatAsState(
+        targetValue = batteryLevel.toFloat(),
+        animationSpec = tween(700),
+        label = "banner_battery_anim"
+    )
+    
+    val pulseTransition = rememberInfiniteTransition(label = "banner_pulse")
+    val chargingPulseAlpha by pulseTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "charging_pulse_alpha"
+    )
+
+    val batteryColor = when {
+        isCharging -> HighlightSky
+        batteryLevel <= 20 -> StatusDanger
+        batteryLevel <= 50 -> StatusYellow
+        else -> StatusSuccess
+    }
+    
+    val currentIconAlpha = if (isCharging) chargingPulseAlpha else 1f
+    val currentBgAlpha = if (isCharging) chargingPulseAlpha * 0.25f else 0.15f
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("tah6519_estimated_battery_banner")
+            .clickable { onNavigateToBattery() },
+        colors = CardDefaults.cardColors(containerColor = DarkPanel),
+        border = BorderStroke(1.dp, batteryColor.copy(alpha = 0.4f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(batteryColor.copy(alpha = currentBgAlpha), CircleShape)
+                            .border(1.dp, batteryColor.copy(alpha = 0.5f * currentIconAlpha), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = when {
+                                isCharging -> Icons.Filled.BatteryChargingFull
+                                batteryLevel <= 20 -> Icons.Filled.BatteryAlert
+                                batteryLevel <= 60 -> Icons.Filled.Battery4Bar
+                                else -> Icons.Filled.BatteryFull
+                            },
+                            contentDescription = "Estimated Battery Level",
+                            tint = batteryColor.copy(alpha = currentIconAlpha),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Philips TAH6519 Accu",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Surface(
+                                color = batteryColor.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = if (isCharging) "Opladen..." else if (batteryLevel <= 20) "Kritiek" else "Optimaal",
+                                    color = batteryColor,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = if (isCharging) {
+                                val mins = ((100 - batteryLevel) * 0.9f).toInt()
+                                "⚡ Snelladen via USB-C • ~${mins}m tot 100%"
+                            } else {
+                                "🔋 Berekend: ~$estHours uur luistertijd (${if (ancMode != "OFF") "ANC Aan" else "ANC Uit"})"
+                            },
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Text(
+                    text = "$batteryLevel%",
+                    color = batteryColor,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.5).sp
+                )
+            }
+
+            // Visual Progress Bar
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .background(DarkBg, shape = RoundedCornerShape(4.dp))
+                        .border(1.dp, DarkBorder, shape = RoundedCornerShape(4.dp))
+                        .padding(1.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth((animatedBatteryLevel / 100f).coerceIn(0f, 1f))
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(batteryColor.copy(alpha = 0.7f), batteryColor)
+                                ),
+                                shape = RoundedCornerShape(3.dp)
+                            )
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "L: ${batteryLevel}% · R: ${batteryLevel}%",
+                        color = TextMuted,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = if (ldacEnabled) "Hi-Res LDAC Mode" else "SBC / AAC Mode",
+                        color = TextMuted,
+                        fontSize = 10.sp
+                    )
+                }
+            }
         }
     }
 }
@@ -14535,9 +16459,12 @@ class SoundscapeSynthesizer {
 }
 
 class MelodySynthesizer {
-    private val generator = SineWaveGenerator()
+    private var audioTrack: AudioTrack? = null
     private var job: kotlinx.coroutines.Job? = null
     
+    @Volatile
+    private var isPlaying = false
+
     fun startMelody(
         trackIndex: Int, 
         isYoutube: Boolean, 
@@ -14545,81 +16472,130 @@ class MelodySynthesizer {
         youtubeTrackName: String = "",
         scope: kotlinx.coroutines.CoroutineScope
     ) {
-        job?.cancel()
-        job = scope.launch {
-            // Calculate EQ gain factors based on 10-band settings and Dynamic Bass
-            val bands = settings.getBands() // 10 floats in dB (-12 to +12)
-            
-            // Low frequencies (Bass: 60Hz, 125Hz, 250Hz) + Dynamic Bass boost
-            val bassDb = ((bands.getOrNull(0) ?: 0f) + (bands.getOrNull(1) ?: 0f) + (bands.getOrNull(2) ?: 0f)) / 3f + 
-                         (if (settings.dynamicBassEnabled) settings.dynamicBassLevel * 3.5f else 0f)
-            val bassGain = Math.pow(10.0, (bassDb / 20.0).toDouble()).toFloat().coerceIn(0.2f, 3.0f)
-            
-            // Mid frequencies (500Hz, 1kHz, 2kHz, 4kHz)
-            val midDb = ((bands.getOrNull(3) ?: 0f) + (bands.getOrNull(4) ?: 0f) + (bands.getOrNull(5) ?: 0f) + (bands.getOrNull(6) ?: 0f)) / 4f
-            val midGain = Math.pow(10.0, (midDb / 20.0).toDouble()).toFloat().coerceIn(0.2f, 2.5f)
-            
-            // High frequencies (Treble: 8kHz, 12kHz, 16kHz)
-            val trebleDb = ((bands.getOrNull(7) ?: 0f) + (bands.getOrNull(8) ?: 0f) + (bands.getOrNull(9) ?: 0f)) / 3f
-            val trebleGain = Math.pow(10.0, (trebleDb / 20.0).toDouble()).toFloat().coerceIn(0.2f, 2.5f)
-            
-            if (isYoutube) {
-                // Do not synthesize fake sounds when playing real YouTube music via WebView
-                return@launch
-            } else {
-                when (trackIndex % 4) {
-                    0 -> {
-                        val freqs = listOf(261.63f * midGain, 293.66f * midGain, 329.63f * midGain, 392.00f * trebleGain, 440.00f * trebleGain, 130.81f * bassGain)
-                        while (true) {
-                            for (f in freqs) {
-                                generator.startTone(f, 0.14f)
-                                delay(220)
-                                generator.stopTone()
-                                delay(40)
-                            }
-                            delay(300)
+        stopMelody()
+        if (isYoutube) return
+
+        job = scope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            val sampleRate = 44100
+            val minBufferSize = AudioTrack.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+            val bufferSize = maxOf(minBufferSize, 4096)
+
+            try {
+                val track = AudioTrack(
+                    AudioManager.STREAM_MUSIC,
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    bufferSize,
+                    AudioTrack.MODE_STREAM
+                )
+
+                audioTrack = track
+                isPlaying = true
+                track.play()
+
+                val bands = settings.getBands()
+                val bassDb = ((bands.getOrNull(0) ?: 0f) + (bands.getOrNull(1) ?: 0f) + (bands.getOrNull(2) ?: 0f)) / 3f + 
+                             (if (settings.dynamicBassEnabled) settings.dynamicBassLevel * 3.5f else 0f)
+                val bassGain = Math.pow(10.0, (bassDb / 20.0).toDouble()).toFloat().coerceIn(0.2f, 2.5f)
+                
+                val midDb = ((bands.getOrNull(3) ?: 0f) + (bands.getOrNull(4) ?: 0f) + (bands.getOrNull(5) ?: 0f) + (bands.getOrNull(6) ?: 0f)) / 4f
+                val midGain = Math.pow(10.0, (midDb / 20.0).toDouble()).toFloat().coerceIn(0.2f, 2.0f)
+                
+                val trebleDb = ((bands.getOrNull(7) ?: 0f) + (bands.getOrNull(8) ?: 0f) + (bands.getOrNull(9) ?: 0f)) / 3f
+                val trebleGain = Math.pow(10.0, (trebleDb / 20.0).toDouble()).toFloat().coerceIn(0.2f, 2.0f)
+
+                var phase1 = 0.0
+                var phase2 = 0.0
+                var sampleIdx = 0L
+
+                val pcmBuffer = ShortArray(1024)
+                val byteBuffer = ByteArray(2048)
+
+                while (isPlaying) {
+                    val freq1: Double
+                    val freq2: Double
+                    val volume: Double
+
+                    when (trackIndex % 4) {
+                        0 -> { // Philips Signature Sound - Warm Harmonized Melodic Chords
+                            val sequence = doubleArrayOf(261.63, 329.63, 392.00, 523.25, 392.00, 329.63)
+                            val noteIdx = ((sampleIdx / 7500) % sequence.size).toInt()
+                            freq1 = sequence[noteIdx] * midGain
+                            freq2 = sequence[noteIdx] * 0.5 * bassGain
+                            volume = 0.28
+                        }
+                        1 -> { // Spatial Audio Demo - Binaural Sweep
+                            val sequence = doubleArrayOf(110.0, 220.0, 440.0, 880.0, 440.0)
+                            val noteIdx = ((sampleIdx / 5500) % sequence.size).toInt()
+                            freq1 = sequence[noteIdx] * midGain
+                            freq2 = (sequence[noteIdx] + 3.0) * trebleGain
+                            volume = 0.25
+                        }
+                        2 -> { // Focus White Noise - Soothing Soft Ambient Synth Drone
+                            freq1 = 130.81 * bassGain
+                            freq2 = 196.00 * midGain
+                            volume = 0.22
+                        }
+                        else -> { // Deep Bass Test - Subwoofer 45Hz/60Hz Deep Bass
+                            val sequence = doubleArrayOf(45.0, 55.0, 65.0, 40.0)
+                            val noteIdx = ((sampleIdx / 9000) % sequence.size).toInt()
+                            freq1 = sequence[noteIdx] * bassGain
+                            freq2 = sequence[noteIdx] * 2.0 * bassGain
+                            volume = 0.40
                         }
                     }
-                    1 -> {
-                        val freqs = listOf(110.00f * bassGain, 220.00f * midGain, 440.00f * midGain, 880.00f * trebleGain, 440.00f * midGain)
-                        while (true) {
-                            for (f in freqs) {
-                                generator.startTone(f, 0.15f)
-                                delay(140)
-                                generator.stopTone()
-                                delay(30)
-                            }
-                            delay(200)
-                        }
+
+                    val angleIncrement1 = 2.0 * Math.PI * freq1 / sampleRate
+                    val angleIncrement2 = 2.0 * Math.PI * freq2 / sampleRate
+
+                    for (i in 0 until pcmBuffer.size) {
+                        val s1 = Math.sin(phase1)
+                        val s2 = Math.sin(phase2)
+                        phase1 += angleIncrement1
+                        phase2 += angleIncrement2
+                        if (phase1 > 2.0 * Math.PI) phase1 -= 2.0 * Math.PI
+                        if (phase2 > 2.0 * Math.PI) phase2 -= 2.0 * Math.PI
+
+                        val mixedSample = (s1 * 0.65 + s2 * 0.35) * volume
+                        val shortVal = (mixedSample * 32767.0).toInt().coerceIn(-32768, 32767).toShort()
+                        pcmBuffer[i] = shortVal
+
+                        val byteIdx = i * 2
+                        byteBuffer[byteIdx] = (shortVal.toInt() and 0x00ff).toByte()
+                        byteBuffer[byteIdx + 1] = ((shortVal.toInt() and 0xff00) ushr 8).toByte()
+
+                        sampleIdx++
                     }
-                    2 -> {
-                        while (true) {
-                            generator.startTone(65.41f * bassGain, 0.35f)
-                            delay(350)
-                            generator.stopTone()
-                            delay(150)
-                        }
-                    }
-                    else -> {
-                        val freqs = listOf(55.0f * bassGain, 110.0f * bassGain, 220.0f * midGain, 330.0f * midGain, 440.0f * trebleGain)
-                        while (true) {
-                            for (f in freqs) {
-                                generator.startTone(f, 0.20f)
-                                delay(250)
-                                generator.stopTone()
-                                delay(50)
-                            }
-                        }
-                    }
+
+                    track.write(byteBuffer, 0, byteBuffer.size)
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
-    
+
     fun stopMelody() {
+        isPlaying = false
         job?.cancel()
         job = null
-        generator.stopTone()
+        try {
+            audioTrack?.let {
+                if (it.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                    it.stop()
+                }
+                it.release()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            audioTrack = null
+        }
     }
 }
 

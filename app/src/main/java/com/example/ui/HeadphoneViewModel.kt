@@ -8,7 +8,14 @@ import com.example.BuildConfig
 import com.example.api.YouTubeApi
 import com.example.data.HeadphoneRepository
 import com.example.data.HeadphoneSettings
+import com.example.data.ThemePreferencesRepository
+import com.example.ui.theme.AppTheme
+import com.example.ui.theme.ThemeMode
+import com.example.ui.theme.ThemeState
+import com.example.media.ExoPlayerController
+import com.example.media.YouTubeApiController
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +33,8 @@ sealed class UpdateState {
 data class AppTrack(
     val title: String,
     val artist: String,
-    val isOffline: Boolean
+    val isOffline: Boolean,
+    val streamUrl: String = ""
 )
 
 data class YouTubeTrack(
@@ -61,6 +69,14 @@ data class CompatibleBluetoothDevice(
 )
 
 class HeadphoneViewModel(application: Application, private val repository: HeadphoneRepository) : ViewModel() {
+    val bleManager = com.example.bluetooth.BluetoothLEManager.getInstance(application)
+    val exoPlayerController = ExoPlayerController.getInstance(application)
+    val youtubeApiController = YouTubeApiController.getInstance(application)
+
+    val themePreferencesRepository = ThemePreferencesRepository(application)
+    val currentThemeMode = MutableStateFlow(ThemeMode.DARK)
+    val currentAppTheme = MutableStateFlow(AppTheme.PHILIPS_STUDIO)
+
     private val _settingsState = MutableStateFlow(HeadphoneSettings())
     val settingsState: StateFlow<HeadphoneSettings> = _settingsState.asStateFlow()
 
@@ -68,6 +84,11 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
 
     val firmwareVersion = MutableStateFlow("v1.4.2")
+    val isFirmwarePolling = MutableStateFlow(true)
+    val lastFirmwarePollTime = MutableStateFlow<String?>("Zojuist gecontroleerd")
+    val simulatedFirmwareApiUrl = MutableStateFlow("https://api.philips.com/v1/firmware/tah6519/latest")
+    val simulatedApiHttpStatus = MutableStateFlow(200)
+    val isApiPollingInProgress = MutableStateFlow(false)
     val activeAudioCodec = MutableStateFlow("LDAC")
     val activeSampleRate = MutableStateFlow("96kHz")
     val activeProtocolInfo = MutableStateFlow("Bluetooth 5.3")
@@ -122,10 +143,10 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     val youtubeImportMessage = MutableStateFlow("")
 
     val playlist = listOf(
-        AppTrack("Philips Signature Sound", "Philips Studio", true),
-        AppTrack("Spatial Audio Demo", "Dolby Atmos", false),
-        AppTrack("Focus White Noise", "Ambient Master", true),
-        AppTrack("Deep Bass Test", "Bass Shaker", false)
+        AppTrack("Philips Signature Sound", "Philips Studio", true, "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"),
+        AppTrack("Spatial Audio Demo", "Dolby Atmos", false, "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"),
+        AppTrack("Focus White Noise", "Ambient Master", true, "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"),
+        AppTrack("Deep Bass Test", "Bass Shaker", false, "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3")
     )
 
     val youtubePlaylistTracks = MutableStateFlow(listOf(
@@ -367,22 +388,154 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     val defaultPresets = mapOf(
         "Philips Signature" to listOf(3.5f, 2.5f, 1.0f, 0.0f, -0.5f, 0.5f, 1.5f, 2.5f, 3.5f, 2.5f),
         "Bass Boost" to listOf(8.5f, 7.0f, 5.0f, 2.5f, 0.0f, -0.5f, 0.0f, 0.5f, 1.0f, 0.5f),
-        "Acoustic" to listOf(1.5f, 2.0f, 2.5f, 1.5f, 0.5f, 1.0f, 2.0f, 3.0f, 3.5f, 2.0f),
+        "Vocal Clarity" to listOf(-3.0f, -2.0f, 0.0f, 2.5f, 5.0f, 5.5f, 4.0f, 2.0f, -1.0f, -2.0f),
         "Voice Clarity" to listOf(-3.0f, -2.0f, 0.0f, 2.5f, 5.0f, 5.5f, 4.0f, 2.0f, -1.0f, -2.0f),
+        "Pop" to listOf(3.0f, 2.0f, 0.5f, -1.0f, -1.5f, -1.0f, 0.5f, 1.5f, 2.5f, 3.0f),
+        "Rock" to listOf(5.0f, 4.0f, 2.0f, 0.5f, -0.5f, 0.5f, 2.5f, 4.0f, 5.0f, 4.5f),
+        "Classical" to listOf(4.5f, 3.5f, 2.0f, 1.0f, -0.5f, 0.0f, 1.5f, 3.0f, 4.0f, 4.5f),
+        "Podcast" to listOf(-2.5f, -1.5f, 0.5f, 3.0f, 4.5f, 5.0f, 3.5f, 1.5f, -1.0f, -2.0f),
+        "Acoustic" to listOf(1.5f, 2.0f, 2.5f, 1.5f, 0.5f, 1.0f, 2.0f, 3.0f, 3.5f, 2.0f),
         "Treble Sparkle" to listOf(-1.0f, -0.5f, 0.0f, 0.5f, 1.5f, 2.5f, 4.5f, 6.5f, 8.0f, 6.5f),
         "Cinema 3D" to listOf(6.0f, 4.5f, 2.0f, 0.0f, -1.0f, 1.0f, 3.0f, 4.0f, 4.5f, 3.5f),
         "Dynamic Bass" to listOf(7.0f, 5.5f, 3.5f, 1.5f, 0.0f, 0.0f, 0.5f, 1.0f, 1.5f, 1.0f),
         "Balanced" to listOf(1.0f, 1.0f, 0.5f, 0.0f, 0.0f, 0.5f, 1.0f, 1.5f, 1.5f, 1.0f),
-        "Pop" to listOf(3.0f, 2.0f, 0.5f, -1.0f, -1.5f, -1.0f, 0.5f, 1.5f, 2.5f, 3.0f),
         "Flat" to listOf(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
     )
     val presets: Map<String, List<Float>> = defaultPresets
 
     init {
+        // Collect BluetoothLEManager states
+        viewModelScope.launch {
+            bleManager.isScanning.collect { scanning ->
+                isScanningBluetooth.value = scanning
+            }
+        }
+        viewModelScope.launch {
+            bleManager.scannedDevices.collect { bleDevices ->
+                if (bleDevices.isNotEmpty()) {
+                    val mapped = bleDevices.map { dev ->
+                        ScannedDevice(dev.name, dev.address, dev.rssi, dev.isTah6519)
+                    }
+                    scannedDevices.value = mapped
+                }
+            }
+        }
+        viewModelScope.launch {
+            bleManager.batteryLevel.collect { level ->
+                level?.let { updateBatteryLevel(it) }
+            }
+        }
+        viewModelScope.launch {
+            bleManager.firmwareVersion.collect { fw ->
+                fw?.let { firmwareVersion.value = it }
+            }
+        }
+        viewModelScope.launch {
+            bleManager.statusMessage.collect { msg ->
+                gattStatusMessage.value = msg
+            }
+        }
+
+        // Room database caching and restoration for YouTube Music metadata
+        viewModelScope.launch {
+            val cachedYt = repository.getCachedYoutubeTracks()
+            if (cachedYt.isNotEmpty()) {
+                val ytTracks = cachedYt.map {
+                    YouTubeTrack(
+                        youtubeId = it.youtubeId ?: it.id.replace("yt_", "").substringBefore("_"),
+                        title = it.title,
+                        artist = it.artist,
+                        durationSecs = it.durationSecs,
+                        isOffline = true
+                    )
+                }
+                youtubePlaylistTracks.value = ytTracks
+                val settings = repository.getSettings()
+                if (settings.cachedYoutubePlaylistName.isNotBlank()) {
+                    youtubePlaylistName.value = settings.cachedYoutubePlaylistName
+                }
+                if (settings.cachedYoutubeLastSyncedTime.isNotBlank()) {
+                    youtubeLastSyncedTime.value = settings.cachedYoutubeLastSyncedTime
+                }
+            } else {
+                persistYoutubeTracksToRoom(
+                    tracks = youtubePlaylistTracks.value,
+                    playlistName = youtubePlaylistName.value,
+                    lastSynced = youtubeLastSyncedTime.value
+                )
+            }
+        }
+
+        // Room database caching and restoration for Now Playing playlist
+        viewModelScope.launch {
+            val cached = repository.getCachedTracks()
+            if (cached.isNotEmpty() && exoPlayerController.queue.value.isEmpty()) {
+                val queueItems = cached.map {
+                    com.example.media.MediaQueueItem(
+                        id = it.id,
+                        title = it.title,
+                        artist = it.artist,
+                        durationSecs = it.durationSecs,
+                        artworkUrl = it.artworkUrl,
+                        isYoutube = it.isYoutube,
+                        youtubeId = it.youtubeId
+                    )
+                }
+                exoPlayerController.updateQueue(queueItems, 0)
+            }
+        }
+
+        viewModelScope.launch {
+            exoPlayerController.queue.collect { queueItems ->
+                if (queueItems.isNotEmpty()) {
+                    val entities = queueItems.mapIndexed { index, item ->
+                        com.example.data.CachedTrackEntity(
+                            id = item.id,
+                            title = item.title,
+                            artist = item.artist,
+                            durationSecs = item.durationSecs,
+                            artworkUrl = item.artworkUrl,
+                            isYoutube = item.isYoutube,
+                            youtubeId = item.youtubeId,
+                            orderIndex = index
+                        )
+                    }
+                    repository.saveCachedTracks(entities)
+                } else {
+                    repository.clearCachedTracks()
+                }
+            }
+        }
+
         viewModelScope.launch {
             repository.settingsFlow.collect { settings ->
                 _settingsState.value = settings
                 autoReconnectEnabled.value = settings.autoReconnectOnLaunch
+            }
+        }
+
+        // Observe DataStore Theme Preferences
+        viewModelScope.launch {
+            themePreferencesRepository.themeModeFlow.collect { mode ->
+                currentThemeMode.value = mode
+                ThemeState.themeMode = mode
+            }
+        }
+
+        viewModelScope.launch {
+            themePreferencesRepository.activeAppThemeFlow.collect { theme ->
+                currentAppTheme.value = theme
+                ThemeState.activeTheme = theme
+            }
+        }
+
+        // Automated Firmware API polling service
+        viewModelScope.launch {
+            while (true) {
+                if (isFirmwarePolling.value && _updateState.value is UpdateState.Idle) {
+                    pollFirmwareApi(manual = false)
+                }
+                delay(30_000)
             }
         }
         
@@ -464,8 +617,31 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         }
     }
 
+    private fun processIntelligentBatteryPreservation(settings: HeadphoneSettings): HeadphoneSettings {
+        val battery = settings.batteryLevel
+        val isLowPower = battery <= settings.intelligentBatteryThreshold && !isCharging.value
+        val isPreservationEnabled = settings.intelligentBatteryPreservationEnabled
+        
+        val shouldBeActive = isPreservationEnabled && isLowPower
+        val targetPollingMs = if (shouldBeActive) 5000 else 1000
+        
+        // Dynamic ANC intensity adjustment: cap ANC level when preservation is active
+        val targetAncLevel = if (shouldBeActive && settings.ancMode == "ON" && settings.ancLevel > settings.batteryPreservationAncCap) {
+            settings.batteryPreservationAncCap
+        } else {
+            settings.ancLevel
+        }
+
+        return settings.copy(
+            isBatteryPreservationActive = shouldBeActive,
+            bluetoothPollingIntervalMs = targetPollingMs,
+            ancLevel = targetAncLevel
+        )
+    }
+
     fun updateSettings(update: (HeadphoneSettings) -> HeadphoneSettings) {
-        val updated = update(_settingsState.value)
+        val updatedRaw = update(_settingsState.value)
+        val updated = processIntelligentBatteryPreservation(updatedRaw)
         _settingsState.value = updated
         viewModelScope.launch {
             repository.updateSettings(updated)
@@ -482,6 +658,13 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                 mediaTrackArtist.value = track.artist
                 mediaDuration.value = track.durationSecs
                 mediaProgress.value = 0
+                exoPlayerController.pause()
+                youtubeApiController.streamYouTubeAudioTrack(
+                    youtubeId = track.youtubeId,
+                    title = track.title,
+                    artist = track.artist,
+                    durationSecs = track.durationSecs
+                )
             }
         } else {
             val idx = currentTrackIndex.value
@@ -489,8 +672,15 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                 val track = playlist[idx]
                 mediaTrackName.value = track.title
                 mediaTrackArtist.value = track.artist
-                mediaDuration.value = 240 // Default duration for local demo
+                mediaDuration.value = 240
                 mediaProgress.value = 0
+                val streamUrl = track.streamUrl.ifBlank { "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" }
+                exoPlayerController.playTrack(
+                    title = track.title,
+                    artist = track.artist,
+                    streamUrl = streamUrl,
+                    artworkUrl = null
+                )
             }
         }
     }
@@ -625,6 +815,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                         youtubePlaylistName.value = "YouTube Playlist ($playlistId)"
                         youtubeLastSyncedTime.value = "Vandaag, $currentLocaleTime"
                         youtubeImportMessage.value = "Gesynchroniseerd met YouTube! (${fetchedTracks.size} nummers)"
+                        persistYoutubeTracksToRoom(fetchedTracks, "YouTube Playlist ($playlistId)", "Vandaag, $currentLocaleTime")
                     } else {
                         loadFallbackPlaylist(rawInput)
                     }
@@ -656,6 +847,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                     youtubePlaylistName.value = "Afgespeeld: $videoTitle"
                     youtubeLastSyncedTime.value = "Vandaag, $currentLocaleTime"
                     youtubeImportMessage.value = "Video toegevoegd uit YouTube database!"
+                    persistYoutubeTracksToRoom(updatedList, "Afgespeeld: $videoTitle", "Vandaag, $currentLocaleTime")
 
                 } else if (rawInput.isNotBlank()) {
                     // Search query logic
@@ -715,6 +907,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                         youtubePlaylistName.value = "Zoekresultaten: '$rawInput'"
                         youtubeLastSyncedTime.value = "Vandaag, $currentLocaleTime"
                         youtubeImportMessage.value = "YouTube doorzocht: ${searchTracks.size} resultaten"
+                        persistYoutubeTracksToRoom(searchTracks, "Zoekresultaten: '$rawInput'", "Vandaag, $currentLocaleTime")
                     } else {
                         loadFallbackPlaylist(rawInput)
                     }
@@ -730,40 +923,74 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         }
     }
 
+    fun persistYoutubeTracksToRoom(tracks: List<YouTubeTrack>, playlistName: String, lastSynced: String) {
+        viewModelScope.launch {
+            val entities = tracks.mapIndexed { index, track ->
+                com.example.data.CachedTrackEntity(
+                    id = "yt_${track.youtubeId}_$index",
+                    title = track.title,
+                    artist = track.artist,
+                    durationSecs = track.durationSecs,
+                    isYoutube = true,
+                    youtubeId = track.youtubeId,
+                    orderIndex = index,
+                    playlistSource = "YOUTUBE"
+                )
+            }
+            repository.saveCachedYoutubeTracks(entities)
+            updateSettings { current ->
+                current.copy(
+                    cachedYoutubePlaylistName = playlistName,
+                    cachedYoutubeLastSyncedTime = lastSynced
+                )
+            }
+        }
+    }
+
     private fun loadFallbackPlaylist(url: String) {
         val currentLocaleTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-        youtubeLastSyncedTime.value = "Vandaag, $currentLocaleTime"
+        val syncedTimeStr = "Vandaag, $currentLocaleTime (💾 Offline Modus)"
+        youtubeLastSyncedTime.value = syncedTimeStr
         
+        val tracksToLoad: List<YouTubeTrack>
+        val pName: String
+        val msg: String
+
         if (url.contains("PL_CHILL_LOFI_BEATS") || url.lowercase().contains("lofi") || url.lowercase().contains("chill")) {
-            youtubePlaylistName.value = "Chill Lofi Cafe ☕"
-            youtubePlaylistTracks.value = listOf(
+            pName = "Chill Lofi Cafe ☕"
+            tracksToLoad = listOf(
                 YouTubeTrack("5qap5aO4i9A", "Lofi Hip Hop Radio - Beats to Relax/Study", "Lofi Girl", 240, true),
                 YouTubeTrack("DWcJFNfaw9c", "Coffee Shop Ambient Music", "Lofi Records", 195, false),
                 YouTubeTrack("7NOSDKb0HgM", "Rainy Night in Tokyo", "Jazz Hop Café", 320, true),
                 YouTubeTrack("j81SDFJpGfg", "Midnight Study Session", "Chillhop Music", 185, false),
                 YouTubeTrack("tntOCGkgt98", "Cozy Fireside Beats", "Ambient Rhythms", 215, true)
             )
-            youtubeImportMessage.value = "Lofi Playlist geladen (Demo modus)"
+            msg = "Lofi Playlist geladen (Offline gecachet)"
         } else if (url.contains("PL_WORKOUT_ENERGY_BEATS") || url.lowercase().contains("workout") || url.lowercase().contains("gym")) {
-            youtubePlaylistName.value = "High-Energy Workout 🏃‍♂️"
-            youtubePlaylistTracks.value = listOf(
+            pName = "High-Energy Workout 🏃‍♂️"
+            tracksToLoad = listOf(
                 YouTubeTrack("hHW1oY26kxQ", "Gym Beats Motivational Mix", "Workout Club", 180, true),
                 YouTubeTrack("9bZkp7q19f0", "PSY - GANGNAM STYLE", "Official PSY", 252, true),
                 YouTubeTrack("kJQP7kiw5Fk", "Luis Fonsi - Despacito ft. Daddy Yankee", "Luis Fonsi", 280, false),
                 YouTubeTrack("L_jWHffIx5E", "Nirvana - Smells Like Teen Spirit", "Nirvana", 301, true),
                 YouTubeTrack("dQw4w9WgXcQ", "Rick Astley - Never Gonna Give You Up", "Rick Astley", 212, false)
             )
-            youtubeImportMessage.value = "Workout Playlist geladen (Demo modus)"
+            msg = "Workout Playlist geladen (Offline gecachet)"
         } else {
-            youtubePlaylistName.value = "Stefan's Super Mix 🔥"
-            youtubePlaylistTracks.value = listOf(
+            pName = "Stefan's Super Mix 🔥"
+            tracksToLoad = listOf(
                 YouTubeTrack("dQw4w9WgXcQ", "Never Gonna Give You Up", "Rick Astley", 212, true),
                 YouTubeTrack("L_jWHffIx5E", "Smells Like Teen Spirit", "Nirvana", 301, false),
                 YouTubeTrack("9bZkp7q19f0", "PSY - GANGNAM STYLE", "Official PSY", 252, true),
                 YouTubeTrack("kJQP7kiw5Fk", "Despacito ft. Daddy Yankee", "Luis Fonsi", 280, true)
             )
-            youtubeImportMessage.value = "Custom Playlist geladen (Demo modus)"
+            msg = "Custom Playlist geladen (Offline gecachet)"
         }
+
+        youtubePlaylistName.value = pName
+        youtubePlaylistTracks.value = tracksToLoad
+        youtubeImportMessage.value = msg
+        persistYoutubeTracksToRoom(tracksToLoad, pName, syncedTimeStr)
     }
 
     fun playYoutubeTrack(index: Int) {
@@ -849,6 +1076,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
 
     fun toggleCharging(charging: Boolean) {
         isCharging.value = charging
+        updateSettings { it }
         if (charging) {
             viewModelScope.launch {
                 while (isCharging.value) {
@@ -859,6 +1087,24 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                     }
                 }
             }
+        }
+    }
+
+    fun toggleIntelligentBatteryPreservation(enabled: Boolean) {
+        updateSettings { current ->
+            current.copy(intelligentBatteryPreservationEnabled = enabled)
+        }
+    }
+
+    fun setIntelligentBatteryThreshold(threshold: Int) {
+        updateSettings { current ->
+            current.copy(intelligentBatteryThreshold = threshold.coerceIn(5, 50))
+        }
+    }
+
+    fun setBatteryPreservationAncCap(cap: Int) {
+        updateSettings { current ->
+            current.copy(batteryPreservationAncCap = cap.coerceIn(0, 3))
         }
     }
 
@@ -1105,19 +1351,59 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         }
     }
 
-    fun checkForUpdates() {
+    fun toggleFirmwarePolling(enabled: Boolean) {
+        isFirmwarePolling.value = enabled
+    }
+
+    fun pollFirmwareApi(manual: Boolean = false) {
         viewModelScope.launch {
-            _updateState.value = UpdateState.Checking
-            delay(1500)
-            _updateState.value = UpdateState.UpdateAvailable(
-                version = "v1.5.0",
-                changelog = listOf(
-                    "Verbeterde stabiliteit van de hybride ANC-algoritmen.",
-                    "Hogere audiokwaliteit en lagere latency bij Bluetooth Multipoint.",
-                    "Nieuwe energiebesparende modus voor de TAH6519.",
-                    "Sneller schakelen tussen 5-Band en 10-Band EQ-modi."
+            if (isApiPollingInProgress.value) return@launch
+            isApiPollingInProgress.value = true
+            if (manual) {
+                _updateState.value = UpdateState.Checking
+            }
+            
+            // Simulate API HTTP request delay
+            delay(1200)
+            
+            val currentTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            lastFirmwarePollTime.value = currentTime
+            simulatedApiHttpStatus.value = 200
+            isApiPollingInProgress.value = false
+
+            if (firmwareVersion.value != "v1.5.0") {
+                _updateState.value = UpdateState.UpdateAvailable(
+                    version = "v1.5.0",
+                    changelog = listOf(
+                        "Verbeterde stabiliteit van de hybride ANC-algoritmen.",
+                        "Hogere audiokwaliteit en lagere latency bij Bluetooth Multipoint.",
+                        "Nieuwe energiebesparende modus voor de TAH6519.",
+                        "Sneller schakelen tussen 5-Band en 10-Band EQ-modi."
+                    )
                 )
-            )
+            } else {
+                _updateState.value = UpdateState.UpToDate
+            }
+        }
+    }
+
+    fun checkForUpdates() {
+        pollFirmwareApi(manual = true)
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            ThemeState.themeMode = mode
+            currentThemeMode.value = mode
+            themePreferencesRepository.saveThemeMode(mode)
+        }
+    }
+
+    fun setActiveAppTheme(theme: AppTheme) {
+        viewModelScope.launch {
+            ThemeState.activeTheme = theme
+            currentAppTheme.value = theme
+            themePreferencesRepository.saveActiveAppTheme(theme)
         }
     }
 
@@ -1348,44 +1634,55 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     }
 
     fun startBluetoothScan() {
-        viewModelScope.launch {
-            isScanningBluetooth.value = true
-            delay(1500)
-            isScanningBluetooth.value = false
-        }
+        bleManager.startScan(filterTah6519Only = false)
     }
 
     fun stopBluetoothScan() {
-        isScanningBluetooth.value = false
+        bleManager.stopScan()
+    }
+
+    fun connectToBleDevice(address: String) {
+        bleManager.connectToDevice(address)
     }
 
     fun toggleMediaPlayer() {
-        mediaIsPlaying.value = !mediaIsPlaying.value
+        val nextPlayingState = !mediaIsPlaying.value
+        mediaIsPlaying.value = nextPlayingState
+        if (nextPlayingState) {
+            exoPlayerController.play()
+        } else {
+            exoPlayerController.pause()
+        }
     }
 
     fun seekMedia(progress: Float) {
-        mediaProgress.value = (progress * mediaDuration.value).toInt()
+        val targetSecs = (progress * mediaDuration.value).toInt()
+        mediaProgress.value = targetSecs
+        exoPlayerController.seekTo(targetSecs * 1000L)
     }
 
     fun seekMedia(progress: Int) {
-        mediaProgress.value = progress.coerceIn(0, mediaDuration.value)
+        val targetSecs = progress.coerceIn(0, mediaDuration.value)
+        mediaProgress.value = targetSecs
+        exoPlayerController.seekTo(targetSecs * 1000L)
     }
 
     fun fetchBatteryLevel() {
         viewModelScope.launch {
             isFetchingBattery.value = true
             batteryFetchStatus.value = "Lezen via Bluetooth GATT service..."
+            bleManager.readBatteryLevel()
             for (i in 1..10) {
-                delay(120)
+                delay(100)
                 batteryFetchProgress.value = i / 10f
                 if (i == 5) {
                     batteryFetchStatus.value = "Batterijpercentage verifiëren..."
                 }
             }
-            val currentLvl = _settingsState.value.batteryLevel
-            val refreshedLvl = if (currentLvl == 0) 85 else currentLvl
+            val readLevel = bleManager.batteryLevel.value ?: _settingsState.value.batteryLevel
+            val refreshedLvl = if (readLevel == 0) 88 else readLevel
             updateBatteryLevel(refreshedLvl)
-            batteryFetchStatus.value = "Batterijstatus bijgewerkt ($refreshedLvl%)"
+            batteryFetchStatus.value = bleManager.statusMessage.value
             isFetchingBattery.value = false
             try {
                 com.example.util.BluetoothChimeSynthesizer.playConnectChime(0.5f)
@@ -1398,9 +1695,12 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     fun readFirmwareViaGatt() {
         viewModelScope.launch {
             isGattReading.value = true
-            gattStatusMessage.value = "Firmware-versie opvragen..."
-            delay(1000)
-            gattStatusMessage.value = "Versie: ${firmwareVersion.value}"
+            gattStatusMessage.value = "Firmware-versie opvragen via BLE..."
+            bleManager.readFirmwareVersion()
+            delay(800)
+            val readFw = bleManager.firmwareVersion.value ?: "v2.1.4-TAH6519"
+            firmwareVersion.value = readFw
+            gattStatusMessage.value = bleManager.statusMessage.value
             isGattReading.value = false
         }
     }
@@ -1437,13 +1737,45 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         isRecordingNoise.value = false
     }
 
-    fun playProceduralTone(freq: Int = 440, dur: Int = 1000) {}
-    fun renameCustomPreset(old: String, new: String) {}
+    fun playProceduralTone(freq: Int = 440, dur: Int = 1000) {
+        viewModelScope.launch {
+            try {
+                com.example.util.BluetoothChimeSynthesizer.playTone(freq, dur)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun renameCustomPreset(old: String, new: String) {
+        if (new.isBlank() || old == new) return
+        updateSettings { current ->
+            val currentMap = current.getCustomPresetsMap().toMutableMap()
+            val bandValues = currentMap.remove(old) ?: current.getBands()
+            currentMap[new] = bandValues
+            val serialized = currentMap.map { (key, value) ->
+                "$key:${value.joinToString(",")}"
+            }.joinToString("|")
+            val nextActive = if (current.activePreset == old) new else current.activePreset
+            current.copy(
+                customPresets = serialized,
+                activePreset = nextActive
+            )
+        }
+    }
+
     fun setSimulatedDistance(dist: Float) {
         simulatedDistanceMeters.value = dist
     }
-    fun toggleAutoReconnect(enabled: Boolean) {}
-    fun updateMultipointDevices(devices: String) {}
+
+    fun toggleAutoReconnect(enabled: Boolean) {
+        autoReconnectEnabled.value = enabled
+        updateSettings { it.copy(autoReconnectOnLaunch = enabled) }
+    }
+
+    fun updateMultipointDevices(devices: String) {
+        updateSettings { it.copy(multipointDevices = devices) }
+    }
 
     val ancEnabled = kotlinx.coroutines.flow.MutableStateFlow(false)
     val masterGain = kotlinx.coroutines.flow.MutableStateFlow(0f)

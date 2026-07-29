@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [HeadphoneSettings::class], version = 9, exportSchema = false)
+@Database(entities = [HeadphoneSettings::class, CachedTrackEntity::class], version = 12, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun headphoneDao(): HeadphoneDao
+    abstract fun cachedTrackDao(): CachedTrackDao
 
     companion object {
         @Volatile

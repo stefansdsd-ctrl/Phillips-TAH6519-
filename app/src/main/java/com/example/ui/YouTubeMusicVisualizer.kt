@@ -33,7 +33,8 @@ import kotlin.math.PI
 enum class VisualizerMode(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     SPECTRUM_BARS("Spectrum Staven", Icons.Default.GraphicEq),
     RADIAL_PULSE("Cirkel Pulse", Icons.Default.RadioButtonChecked),
-    LIQUID_WAVE("Liquid Waves", Icons.Default.Waves)
+    LIQUID_WAVE("Liquid Waves", Icons.Default.Waves),
+    NEON_MATRIX("Neon Matrix", Icons.Default.ShowChart)
 }
 
 @Composable
@@ -254,6 +255,16 @@ fun YouTubeMusicVisualizer(
                     }
                     VisualizerMode.LIQUID_WAVE -> {
                         LiquidWaveCanvas(
+                            isPlaying = isPlaying,
+                            phase = phase,
+                            sensitivity = sensitivity,
+                            primaryColor = primaryColor,
+                            secondaryColor = secondaryColor,
+                            accentColor = accentColor
+                        )
+                    }
+                    VisualizerMode.NEON_MATRIX -> {
+                        NeonMatrixCanvas(
                             isPlaying = isPlaying,
                             phase = phase,
                             sensitivity = sensitivity,
@@ -554,6 +565,78 @@ private fun LiquidWaveCanvas(
                     endY = height
                 )
             )
+        }
+    }
+}
+
+@Composable
+private fun NeonMatrixCanvas(
+    isPlaying: Boolean,
+    phase: Float,
+    sensitivity: Float,
+    primaryColor: Color,
+    secondaryColor: Color,
+    accentColor: Color
+) {
+    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+        val width = size.width
+        val height = size.height
+        val linesCount = 24
+        val pointsPerLine = 40
+        
+        for (i in 0 until linesCount) {
+            val progress = i.toFloat() / linesCount
+            val depthFactor = progress
+            
+            val lineSpacing = height / linesCount
+            // scrolling effect
+            val scroll = (phase * 1.5f * lineSpacing) % lineSpacing
+            val yBase = (progress * height) + scroll
+            
+            if (yBase > height + lineSpacing) continue
+            
+            val path = Path()
+            path.moveTo(0f, yBase)
+            
+            for (j in 0..pointsPerLine) {
+                val x = (j.toFloat() / pointsPerLine) * width
+                
+                // Dist to center to attenuate edges (like joy division plot)
+                val distToCenter = kotlin.math.abs(x - width / 2f) / (width / 2f)
+                val attenuation = (1f - distToCenter * distToCenter).coerceIn(0f, 1f)
+                
+                // Generate complex waveforms
+                val amp = if (isPlaying) {
+                    val wave1 = kotlin.math.sin(phase * 4f + j * 0.4f - i * 0.3f)
+                    val wave2 = kotlin.math.cos(phase * 2.5f - j * 0.6f + i * 0.5f)
+                    val beat = kotlin.math.sin(phase * 6f) * 0.8f
+                    ((wave1 + wave2 + beat) * 25.dp.toPx() * sensitivity * depthFactor * attenuation)
+                } else {
+                    kotlin.math.sin(phase * 0.8f + j * 0.2f) * 2.dp.toPx() * depthFactor * attenuation
+                }
+                
+                // Make peaks mostly upwards
+                val y = yBase - kotlin.math.abs(amp)
+                path.lineTo(x, y)
+            }
+            
+            val lineWidth = 1.dp.toPx() + (depthFactor * 2.dp.toPx())
+            val lineAlpha = (depthFactor * 0.9f + 0.1f).coerceIn(0f, 1f)
+            val strokeColor = if (i % 3 == 0) accentColor else if (i % 2 == 0) primaryColor else secondaryColor
+            
+            drawPath(
+                path = path,
+                color = strokeColor.copy(alpha = lineAlpha),
+                style = Stroke(width = lineWidth, cap = StrokeCap.Round)
+            )
+            
+            if (isPlaying && depthFactor > 0.4f) {
+                drawPath(
+                    path = path,
+                    color = strokeColor.copy(alpha = lineAlpha * 0.4f * (sensitivity / 2f).coerceAtMost(1f)),
+                    style = Stroke(width = lineWidth * 3f, cap = StrokeCap.Round)
+                )
+            }
         }
     }
 }

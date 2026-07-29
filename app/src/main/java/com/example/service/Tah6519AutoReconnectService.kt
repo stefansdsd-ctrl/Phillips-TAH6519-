@@ -17,6 +17,23 @@ import kotlinx.coroutines.launch
 
 class Tah6519AutoReconnectService : Service() {
 
+    override fun attachBaseContext(newBase: Context?) {
+        if (newBase != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val attributionContext = newBase.createAttributionContext("default")
+            super.attachBaseContext(attributionContext)
+        } else {
+            super.attachBaseContext(newBase)
+        }
+    }
+
+    override fun getAttributionTag(): String? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            "default"
+        } else {
+            super.getAttributionTag()
+        }
+    }
+
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
 
     companion object {

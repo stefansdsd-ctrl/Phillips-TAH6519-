@@ -140,4 +140,51 @@ object BluetoothChimeSynthesizer {
             e.printStackTrace()
         }
     }
+
+    @Suppress("DEPRECATION")
+    suspend fun playTone(frequency: Int = 440, durationMs: Int = 1000, volume: Float = 0.8f) = withContext(Dispatchers.Default) {
+        try {
+            val sampleRate = 44100
+            val numSamples = (sampleRate * (durationMs / 1000.0)).toInt().coerceAtLeast(441)
+            val generatedSnd = ByteArray(2 * numSamples)
+            var byteIdx = 0
+
+            for (i in 0 until numSamples) {
+                val t = i.toDouble() / sampleRate
+                val attack = if (i < 500) i / 500.0 else 1.0
+                val release = if (i > numSamples - 500) (numSamples - i) / 500.0 else 1.0
+                val envelope = attack * release
+                val wave = sin(2.0 * Math.PI * frequency * t)
+                val valShort = (wave * envelope * 0.7 * 32767 * volume).toInt().coerceIn(-32768, 32767).toShort()
+                generatedSnd[byteIdx++] = (valShort.toInt() and 0x00ff).toByte()
+                generatedSnd[byteIdx++] = ((valShort.toInt() and 0xff00) ushr 8).toByte()
+            }
+
+            val minBufferSize = AudioTrack.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+
+            val track = AudioTrack(
+                AudioManager.STREAM_MUSIC,
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(minBufferSize, generatedSnd.size),
+                AudioTrack.MODE_STATIC
+            )
+
+            track.write(generatedSnd, 0, generatedSnd.size)
+            track.play()
+
+            delay(durationMs + 100L)
+            if (track.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                track.stop()
+            }
+            track.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }
