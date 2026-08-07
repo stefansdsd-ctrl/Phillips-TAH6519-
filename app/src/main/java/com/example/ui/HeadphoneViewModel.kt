@@ -9,6 +9,7 @@ import com.example.api.YouTubeApi
 import com.example.data.HeadphoneRepository
 import com.example.data.HeadphoneSettings
 import com.example.data.ThemePreferencesRepository
+import com.example.data.EqualizerPreferencesRepository
 import com.example.ui.theme.AppTheme
 import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.ThemeState
@@ -74,8 +75,10 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     val youtubeApiController = YouTubeApiController.getInstance(application)
 
     val themePreferencesRepository = ThemePreferencesRepository(application)
+    val equalizerPreferencesRepository = EqualizerPreferencesRepository(application)
     val currentThemeMode = MutableStateFlow(ThemeMode.DARK)
     val currentAppTheme = MutableStateFlow(AppTheme.PHILIPS_STUDIO)
+    val customAccentHex = MutableStateFlow("#00E5FF")
 
     private val _settingsState = MutableStateFlow(HeadphoneSettings())
     val settingsState: StateFlow<HeadphoneSettings> = _settingsState.asStateFlow()
@@ -104,6 +107,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     val isAutoReconnecting = MutableStateFlow(false)
     val isCharging = MutableStateFlow(false)
     val isConnecting = MutableStateFlow(false)
+    val connectionSuccessEvent = MutableStateFlow<String?>(null)
     val isFetchingBattery = MutableStateFlow(false)
     val isFindMyBeeping = MutableStateFlow(false)
     val findMySignalStatus = MutableStateFlow("Gereed voor opsporen")
@@ -529,6 +533,30 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
             }
         }
 
+        viewModelScope.launch {
+            themePreferencesRepository.customAccentHexFlow.collect { hex ->
+                customAccentHex.value = hex
+                try {
+                    val colorInt = android.graphics.Color.parseColor(hex)
+                    ThemeState.customAccentColor = androidx.compose.ui.graphics.Color(colorInt)
+                } catch (e: Exception) {
+                    ThemeState.customAccentColor = androidx.compose.ui.graphics.Color(0xFF00E5FF)
+                }
+            }
+        }
+
+        // Observe DataStore Equalizer Preferences
+        viewModelScope.launch {
+            equalizerPreferencesRepository.equalizerPreferencesFlow.collect { eqData ->
+                _settingsState.value = _settingsState.value.copyWithBands(eqData.bands).copy(
+                    activePreset = eqData.activePreset,
+                    customPresets = eqData.customPresetsSerialized,
+                    masterGain = eqData.masterGain,
+                    dynamicBassLevel = eqData.dynamicBassLevel
+                )
+            }
+        }
+
         // Automated Firmware API polling service
         viewModelScope.launch {
             while (true) {
@@ -595,7 +623,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                     val duration = mediaDuration.value
                     if (currentProgress < duration) {
                         mediaProgress.value = currentProgress + 1
-                    } else {
+                    } else if (!isYoutubeActive.value) {
                         playNextTrack()
                     }
                 }
@@ -645,6 +673,13 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         _settingsState.value = updated
         viewModelScope.launch {
             repository.updateSettings(updated)
+            equalizerPreferencesRepository.saveEqualizerPreferences(
+                activePreset = updated.activePreset ?: "Philips Signature",
+                bands = updated.getBands(),
+                customPresetsSerialized = updated.customPresets,
+                masterGain = updated.masterGain,
+                dynamicBassLevel = updated.dynamicBassLevel
+            )
         }
     }
 
@@ -659,12 +694,6 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                 mediaDuration.value = track.durationSecs
                 mediaProgress.value = 0
                 exoPlayerController.pause()
-                youtubeApiController.streamYouTubeAudioTrack(
-                    youtubeId = track.youtubeId,
-                    title = track.title,
-                    artist = track.artist,
-                    durationSecs = track.durationSecs
-                )
             }
         } else {
             val idx = currentTrackIndex.value
@@ -882,10 +911,12 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
                     if (searchTracks.isEmpty()) {
                         try {
                             val piped = com.example.api.PipedApi.create()
-                            val results = piped.searchMusic(query = rawInput)
+                            val response = piped.searchMusic(query = rawInput)
+                            val results = response.items ?: emptyList()
                             if (results.isNotEmpty()) {
                                 searchTracks = results.mapNotNull { item ->
-                                    val vId = item.url?.replace("/watch?v=", "") ?: ""
+                                    var vId = item.url?.replace("/watch?v=", "") ?: ""
+                                    if (vId.contains("&")) vId = vId.substringBefore("&")
                                     if (vId.isNotBlank()) {
                                         YouTubeTrack(
                                             youtubeId = vId,
@@ -1207,6 +1238,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
             }
             gattStatusMessage.value = "Connected"
             isConnecting.value = false
+            connectionSuccessEvent.value = devName
             com.example.util.BluetoothChimeSynthesizer.playConnectChime()
         }
     }
@@ -1243,6 +1275,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
             }
             gattStatusMessage.value = "Verbonden (${device.name})"
             isConnecting.value = false
+            connectionSuccessEvent.value = device.name
             try {
                 com.example.util.BluetoothChimeSynthesizer.playConnectChime()
             } catch (e: Exception) {
@@ -1252,6 +1285,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     }
 
     fun disconnectDevice(device: String = "") {
+        connectionSuccessEvent.value = null
         updateSettings { current ->
             current.copy(connected = false)
         }
@@ -1261,6 +1295,14 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         viewModelScope.launch {
             com.example.util.BluetoothChimeSynthesizer.playDisconnectChime()
         }
+    }
+
+    fun dismissConnectionSuccessEvent() {
+        connectionSuccessEvent.value = null
+    }
+
+    fun triggerConnectionSuccessAnimation(name: String = "") {
+        connectionSuccessEvent.value = if (name.isNotBlank()) name else _settingsState.value.connectedDeviceName
     }
 
     fun simulateConnectionLoss() {
@@ -1407,6 +1449,19 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         }
     }
 
+    fun setCustomAccentHex(hex: String) {
+        viewModelScope.launch {
+            try {
+                val colorInt = android.graphics.Color.parseColor(hex)
+                ThemeState.customAccentColor = androidx.compose.ui.graphics.Color(colorInt)
+            } catch (e: Exception) {
+                ThemeState.customAccentColor = androidx.compose.ui.graphics.Color(0xFF00E5FF)
+            }
+            customAccentHex.value = hex
+            themePreferencesRepository.saveCustomAccentHex(hex)
+        }
+    }
+
     fun startUpdate() {
         viewModelScope.launch {
             _updateState.value = UpdateState.Updating(0f, "Firmware downloaden...")
@@ -1429,6 +1484,7 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     fun resetAll() {
         viewModelScope.launch {
             repository.resetSettings()
+            equalizerPreferencesRepository.resetEqualizerPreferences()
             firmwareVersion.value = "v1.4.2"
             _updateState.value = UpdateState.Idle
             _settingsState.value = HeadphoneSettings()
@@ -1438,6 +1494,13 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     fun setAncLevel(level: Int) {
         updateSettings { current ->
             current.copy(ancLevel = level)
+        }
+    }
+
+    fun setTransparencyIntensity(level: Int) {
+        val coerced = level.coerceIn(1, 5)
+        updateSettings { current ->
+            current.copy(transparencyIntensity = coerced)
         }
     }
 
@@ -1603,6 +1666,30 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         }
     }
 
+    fun toggleSpeakToAwareness(enabled: Boolean) {
+        updateSettings { current ->
+            current.copy(speakToAwarenessEnabled = enabled)
+        }
+    }
+
+    fun setSpeakToAwarenessSensitivity(sensitivity: Int) {
+        updateSettings { current ->
+            current.copy(speakToAwarenessSensitivity = sensitivity)
+        }
+    }
+
+    fun setAmbientEnvironmentDb(db: Int) {
+        updateSettings { current ->
+            current.copy(ambientEnvironmentDb = db)
+        }
+    }
+
+    fun toggleAutoWindShielding(enabled: Boolean) {
+        updateSettings { current ->
+            current.copy(autoWindShieldingEnabled = enabled)
+        }
+    }
+
     fun toggleTouchControls(enabled: Boolean) {
         updateSettings { current ->
             current.copy(touchControlsEnabled = enabled)
@@ -1648,14 +1735,16 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
     fun toggleMediaPlayer() {
         val nextPlayingState = !mediaIsPlaying.value
         mediaIsPlaying.value = nextPlayingState
-        if (nextPlayingState) {
-            exoPlayerController.play()
-        } else {
-            exoPlayerController.pause()
+        if (!isYoutubeActive.value) {
+            if (nextPlayingState) {
+                exoPlayerController.play()
+            } else {
+                exoPlayerController.pause()
+            }
         }
     }
-
     fun seekMedia(progress: Float) {
+
         val targetSecs = (progress * mediaDuration.value).toInt()
         mediaProgress.value = targetSecs
         exoPlayerController.seekTo(targetSecs * 1000L)

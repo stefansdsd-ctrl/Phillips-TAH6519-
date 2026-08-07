@@ -14,6 +14,7 @@ fun YouTubePlayer(
     youtubeId: String,
     isPlaying: Boolean,
     progressSecs: Int,
+    onVideoEnded: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AndroidView(
@@ -27,6 +28,14 @@ fun YouTubePlayer(
                 settings.allowFileAccess = true
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
+                
+                addJavascriptInterface(object : Any() {
+                    @android.webkit.JavascriptInterface
+                    fun onVideoEnded() {
+                        post { onVideoEnded() }
+                    }
+                }, "AndroidBridge")
+
                 webViewClient = object : WebViewClient() {
                     override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                         return false
@@ -36,61 +45,73 @@ fun YouTubePlayer(
             }
         },
         update = { webView ->
-            val tagKey = "$youtubeId-$isPlaying"
-            val currentTag = webView.tag as? String
+            if (webView.tag == null) {
+                webView.tag = ""
+            }
+            val currentTag = webView.tag as? String ?: ""
+            val parts = currentTag.split(":")
+            val currentVideoId = parts.getOrNull(0) ?: ""
+            val currentPlayingState = parts.getOrNull(1) == "play"
             
-            if (currentTag != tagKey) {
-                webView.tag = tagKey
-                val currentVideoId = currentTag?.split(":")?.firstOrNull()
-                
-                if (currentVideoId != youtubeId) {
-                    webView.tag = "$youtubeId:${if (isPlaying) "play" else "pause"}"
-                    val autoplayParam = if (isPlaying) 1 else 0
-                    val htmlData = """
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                            <style>
-                                body, html { margin:0; padding:0; width:100%; height:100%; background-color:#000; overflow:hidden; }
-                                iframe { width:100%; height:100%; border:0; }
-                            </style>
-                        </head>
-                        <body>
-                            <iframe id="ytplayer" 
-                                    type="text/html"
-                                    src="https://www.youtube.com/embed/$youtubeId?enablejsapi=1&autoplay=$autoplayParam&playsinline=1&controls=1&rel=0&modestbranding=1" 
-                                    allow="autoplay; encrypted-media; picture-in-picture" 
-                                    allowfullscreen>
-                            </iframe>
-                            <script>
-                                var playerFrame = document.getElementById('ytplayer');
-                                function sendCommand(func) {
-                                    if (playerFrame && playerFrame.contentWindow) {
-                                        playerFrame.contentWindow.postMessage(JSON.stringify({
-                                            'event': 'command',
-                                            'func': func,
-                                            'args': []
-                                        }), '*');
+            if (currentVideoId != youtubeId) {
+                webView.tag = "$youtubeId:${if (isPlaying) "play" else "pause"}"
+                val autoplayParam = if (isPlaying) 1 else 0
+                val htmlData = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                        <style>
+                            body, html { margin:0; padding:0; width:100%; height:100%; background-color:#000; overflow:hidden; }
+                            #ytplayer { width:100%; height:100%; border:0; }
+                        </style>
+                    </head>
+                    <body>
+                        <div id="ytplayer"></div>
+                        <script>
+                            var tag = document.createElement('script');
+                            tag.src = "https://www.youtube.com/iframe_api";
+                            var firstScriptTag = document.getElementsByTagName('script')[0];
+                            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+                            var player;
+                            function onYouTubeIframeAPIReady() {
+                                player = new YT.Player('ytplayer', {
+                                    height: '100%',
+                                    width: '100%',
+                                    videoId: '$youtubeId',
+                                    playerVars: {
+                                        'playsinline': 1,
+                                        'autoplay': $autoplayParam,
+                                        'controls': 1,
+                                        'rel': 0,
+                                        'modestbranding': 1
+                                    },
+                                    events: {
+                                        'onStateChange': function(event) {
+                                            if (event.data == YT.PlayerState.ENDED) {
+                                                AndroidBridge.onVideoEnded();
+                                            }
+                                        }
                                     }
-                                }
-                                function play() { sendCommand('playVideo'); }
-                                function pause() { sendCommand('pauseVideo'); }
-                            </script>
-                        </body>
-                        </html>
-                    """.trimIndent()
-                    webView.loadDataWithBaseURL("https://www.youtube.com", htmlData, "text/html", "UTF-8", null)
+                                });
+                            }
+
+                            function play() { if (player && typeof player.playVideo === 'function') player.playVideo(); }
+                            function pause() { if (player && typeof player.pauseVideo === 'function') player.pauseVideo(); }
+                        </script>
+                    </body>
+                    </html>
+                """.trimIndent()
+                webView.loadDataWithBaseURL("https://www.youtube.com", htmlData, "text/html", "UTF-8", null)
+            } else if (currentPlayingState != isPlaying) {
+                webView.tag = "$youtubeId:${if (isPlaying) "play" else "pause"}"
+                if (isPlaying) {
+                    webView.evaluateJavascript("play();", null)
                 } else {
-                    if (isPlaying) {
-                        webView.evaluateJavascript("play();", null)
-                    } else {
-                        webView.evaluateJavascript("pause();", null)
-                    }
+                    webView.evaluateJavascript("pause();", null)
                 }
             }
         }
     )
 }
-
-

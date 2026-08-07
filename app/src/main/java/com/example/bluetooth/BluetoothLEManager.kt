@@ -79,6 +79,12 @@ class BluetoothLEManager private constructor(context: Context) {
     private val _batteryLevel = MutableStateFlow<Int?>(null)
     val batteryLevel: StateFlow<Int?> = _batteryLevel.asStateFlow()
 
+    private val _batteryPowerState = MutableStateFlow<String?>(null)
+    val batteryPowerState: StateFlow<String?> = _batteryPowerState.asStateFlow()
+
+    private val _batteryHealthPercent = MutableStateFlow<Int?>(null)
+    val batteryHealthPercent: StateFlow<Int?> = _batteryHealthPercent.asStateFlow()
+
     private val _firmwareVersion = MutableStateFlow<String?>(null)
     val firmwareVersion: StateFlow<String?> = _firmwareVersion.asStateFlow()
 
@@ -99,9 +105,12 @@ class BluetoothLEManager private constructor(context: Context) {
         const val PHILIPS_TAH6519_NAME = "Philips TAH6519"
         const val PHILIPS_TAH6519_MAC_MOCK = "00:11:22:33:44:55"
 
-        // Standard GATT Services & Characteristics UUIDs
+        // Standard GATT Services & Characteristics UUIDs (BAS 1.0 & BAS 1.1)
         val SERVICE_BATTERY: UUID = UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb")
         val CHAR_BATTERY_LEVEL: UUID = UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb")
+        val CHAR_BATTERY_LEVEL_STATUS: UUID = UUID.fromString("00002bed-0000-1000-8000-00805f9b34fb")
+        val CHAR_BATTERY_TIME_STATUS: UUID = UUID.fromString("00002bee-0000-1000-8000-00805f9b34fb")
+        val CHAR_BATTERY_HEALTH_STATUS: UUID = UUID.fromString("00002bf1-0000-1000-8000-00805f9b34fb")
 
         val SERVICE_DEVICE_INFO: UUID = UUID.fromString("0000180a-0000-1000-8000-00805f9b34fb")
         val CHAR_FIRMWARE_REVISION: UUID = UUID.fromString("00002a26-0000-1000-8000-00805f9b34fb")
@@ -448,9 +457,11 @@ class BluetoothLEManager private constructor(context: Context) {
         val infoService = gatt.getService(SERVICE_DEVICE_INFO)
         infoService?.getCharacteristic(CHAR_FIRMWARE_REVISION)?.let { queueCharacteristicRead(it) }
 
-        // Read Battery Level
+        // Read Battery Level & BAS 1.1 Status
         val batteryService = gatt.getService(SERVICE_BATTERY)
         batteryService?.getCharacteristic(CHAR_BATTERY_LEVEL)?.let { queueCharacteristicRead(it) }
+        batteryService?.getCharacteristic(CHAR_BATTERY_LEVEL_STATUS)?.let { queueCharacteristicRead(it) }
+        batteryService?.getCharacteristic(CHAR_BATTERY_HEALTH_STATUS)?.let { queueCharacteristicRead(it) }
     }
 
     /**
@@ -609,6 +620,28 @@ class BluetoothLEManager private constructor(context: Context) {
                     _batteryLevel.value = level
                     _statusMessage.value = "Philips TAH6519 Accu: $level%"
                     Log.d(TAG, "GATT Accu Niveau uitgelezen: $level%")
+                }
+            }
+            CHAR_BATTERY_LEVEL_STATUS -> {
+                if (bytes.size >= 3) {
+                    val flags = bytes[0].toInt() and 0xFF
+                    val powerState = ((bytes[2].toInt() and 0xFF) shl 8) or (bytes[1].toInt() and 0xFF)
+                    val isPresent = (powerState and 0x0001) != 0
+                    val chargeState = (powerState shr 5) and 0x03 // 1: Charging, 2: Discharging
+                    val statusText = when (chargeState) {
+                        1 -> "Aan het opladen (USB-C)"
+                        2 -> "In gebruik (Accu $isPresent)"
+                        else -> "Standby"
+                    }
+                    _batteryPowerState.value = statusText
+                    Log.d(TAG, "BAS 1.1 Power State: $statusText")
+                }
+            }
+            CHAR_BATTERY_HEALTH_STATUS -> {
+                if (bytes.size >= 2) {
+                    val healthSummary = bytes[1].toInt() and 0xFF
+                    _batteryHealthPercent.value = healthSummary
+                    Log.d(TAG, "BAS 1.1 Battery Health: $healthSummary%")
                 }
             }
             CHAR_FIRMWARE_REVISION -> {

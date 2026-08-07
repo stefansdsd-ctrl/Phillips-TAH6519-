@@ -18,6 +18,7 @@ class ThemePreferencesRepository(private val context: Context) {
     companion object {
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         val KEY_ACTIVE_APP_THEME = stringPreferencesKey("active_app_theme")
+        val KEY_CUSTOM_ACCENT_HEX = stringPreferencesKey("custom_accent_hex")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.themeDataStore.data.map { preferences ->
@@ -38,6 +39,10 @@ class ThemePreferencesRepository(private val context: Context) {
         }
     }
 
+    val customAccentHexFlow: Flow<String> = context.themeDataStore.data.map { preferences ->
+        preferences[KEY_CUSTOM_ACCENT_HEX] ?: "#00E5FF"
+    }
+
     suspend fun saveThemeMode(mode: ThemeMode) {
         context.themeDataStore.edit { preferences ->
             preferences[KEY_THEME_MODE] = mode.name
@@ -47,6 +52,12 @@ class ThemePreferencesRepository(private val context: Context) {
     suspend fun saveActiveAppTheme(theme: AppTheme) {
         context.themeDataStore.edit { preferences ->
             preferences[KEY_ACTIVE_APP_THEME] = theme.name
+        }
+    }
+
+    suspend fun saveCustomAccentHex(hex: String) {
+        context.themeDataStore.edit { preferences ->
+            preferences[KEY_CUSTOM_ACCENT_HEX] = hex
         }
     }
 }

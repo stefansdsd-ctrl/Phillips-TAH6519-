@@ -15,13 +15,16 @@ enum class AppTheme {
 }
 
 enum class ThemeMode {
-    SYSTEM, DARK, LIGHT
+    LIGHT, AMBIENT, CUSTOM, DARK, SYSTEM
 }
 
 object ThemeState {
     var activeTheme by mutableStateOf(AppTheme.PHILIPS_STUDIO)
     var themeMode by mutableStateOf(ThemeMode.DARK)
     var isLightMode by mutableStateOf(false)
+    var isAmbientMode by mutableStateOf(false)
+    var isCustomMode by mutableStateOf(false)
+    var customAccentColor by mutableStateOf(Color(0xFF00E5FF))
 }
 
 private val DarkColorScheme = darkColorScheme(
@@ -32,8 +35,8 @@ private val DarkColorScheme = darkColorScheme(
 
 private val LightColorScheme = lightColorScheme(
     primary = AccentPrimary,
-    background = Color.White,
-    onBackground = Color.Black
+    background = Color(0xFFF2F4F8),
+    onBackground = Color(0xFF0A1626)
 )
 
 @Composable
@@ -41,18 +44,18 @@ fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val isDark = when (ThemeState.themeMode) {
-        ThemeMode.SYSTEM -> darkTheme
-        ThemeMode.DARK -> true
-        ThemeMode.LIGHT -> false
+    ThemeState.isLightMode = when (ThemeState.themeMode) {
+        ThemeMode.LIGHT -> true
+        ThemeMode.SYSTEM -> !darkTheme
+        else -> false
     }
+    ThemeState.isAmbientMode = (ThemeState.themeMode == ThemeMode.AMBIENT)
+    ThemeState.isCustomMode = (ThemeState.themeMode == ThemeMode.CUSTOM)
 
-    ThemeState.isLightMode = !isDark
-
-    val colorScheme = if (isDark) {
-        DarkColorScheme
-    } else {
+    val colorScheme = if (ThemeState.isLightMode) {
         LightColorScheme
+    } else {
+        DarkColorScheme
     }
 
     MaterialTheme(

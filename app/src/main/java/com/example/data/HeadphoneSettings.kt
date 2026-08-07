@@ -41,6 +41,11 @@ data class HeadphoneSettings(
     val sidetoneLevel: Int = 50,
     val wearingDetectionEnabled: Boolean = true,
     val windNoiseReductionEnabled: Boolean = false,
+    val speakToAwarenessEnabled: Boolean = false,
+    val speakToAwarenessSensitivity: Int = 2, // 1 = Laag, 2 = Medium, 3 = Hoog
+    val transparencyIntensity: Int = 3, // 1 = Low (20%), 2 = Natural (40%), 3 = Balanced (60%), 4 = High Focus (80%), 5 = Max (100%)
+    val ambientEnvironmentDb: Int = 45, // Live simulated room dB level
+    val autoWindShieldingEnabled: Boolean = false,
     
     // Touch Controls
     val touchControlsEnabled: Boolean = true,

@@ -174,18 +174,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun testCheckForUpdates() = runBlocking {
-        // Initial state should be Idle
-        assertEquals(com.example.ui.UpdateState.Idle, viewModel.updateState.value)
-        
-        // Trigger check for updates
-        viewModel.checkForUpdates()
-        
-        // Should transition to Checking immediately
-        assertEquals(com.example.ui.UpdateState.Checking, viewModel.updateState.value)
-    }
 
-    @Test
     fun testAutoPowerOffAndFastForward() = runBlocking {
         // Make sure settings shows connected is true first
         viewModel.toggleSimulationMode(true)

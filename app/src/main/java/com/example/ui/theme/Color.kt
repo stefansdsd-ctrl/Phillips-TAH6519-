@@ -3,6 +3,8 @@ import androidx.compose.ui.graphics.Color
 
 val DarkBg: Color get() = when {
     ThemeState.isLightMode -> Color(0xFFF2F4F8)
+    ThemeState.isAmbientMode -> Color(0xFF0E131F) // Soft Philips Ambilight twilight
+    ThemeState.isCustomMode -> Color(0xFF090D16)
     ThemeState.activeTheme == AppTheme.HIGH_CONTRAST -> Color(0xFF000000)
     ThemeState.activeTheme == AppTheme.NORDIC_FROST -> Color(0xFF061412)
     ThemeState.activeTheme == AppTheme.CYBERPUNK_NEON -> Color(0xFF0B0512)
@@ -12,6 +14,8 @@ val DarkBg: Color get() = when {
 
 val DarkPanel: Color get() = when {
     ThemeState.isLightMode -> Color(0xFFFFFFFF)
+    ThemeState.isAmbientMode -> Color(0xFF182030)
+    ThemeState.isCustomMode -> Color(0xFF121929)
     ThemeState.activeTheme == AppTheme.HIGH_CONTRAST -> Color(0xFF0D0D0D)
     ThemeState.activeTheme == AppTheme.NORDIC_FROST -> Color(0xFF0C211E)
     ThemeState.activeTheme == AppTheme.CYBERPUNK_NEON -> Color(0xFF160924)
@@ -21,6 +25,8 @@ val DarkPanel: Color get() = when {
 
 val DarkCard: Color get() = when {
     ThemeState.isLightMode -> Color(0xFFEAEEF5)
+    ThemeState.isAmbientMode -> Color(0xFF1F2A3E)
+    ThemeState.isCustomMode -> Color(0xFF182236)
     ThemeState.activeTheme == AppTheme.HIGH_CONTRAST -> Color(0xFF181818)
     ThemeState.activeTheme == AppTheme.NORDIC_FROST -> Color(0xFF122E2A)
     ThemeState.activeTheme == AppTheme.CYBERPUNK_NEON -> Color(0xFF200D36)
@@ -30,6 +36,8 @@ val DarkCard: Color get() = when {
 
 val DarkBorder: Color get() = when {
     ThemeState.isLightMode -> Color(0xFFC4D0E0)
+    ThemeState.isAmbientMode -> Color(0xFF2C3B57)
+    ThemeState.isCustomMode -> ThemeState.customAccentColor.copy(alpha = 0.4f)
     ThemeState.activeTheme == AppTheme.HIGH_CONTRAST -> Color(0xFFFFFF00)
     ThemeState.activeTheme == AppTheme.NORDIC_FROST -> Color(0xFF1B423C)
     ThemeState.activeTheme == AppTheme.CYBERPUNK_NEON -> Color(0xFF38125B)
@@ -39,6 +47,8 @@ val DarkBorder: Color get() = when {
 
 val AccentPrimary: Color get() = when {
     ThemeState.isLightMode -> Color(0xFF0066FF)
+    ThemeState.isAmbientMode -> Color(0xFF38BDF8) // Ambilight Cyan
+    ThemeState.isCustomMode -> ThemeState.customAccentColor
     ThemeState.activeTheme == AppTheme.HIGH_CONTRAST -> Color(0xFFFFFF00)
     ThemeState.activeTheme == AppTheme.NORDIC_FROST -> Color(0xFF00E676)
     ThemeState.activeTheme == AppTheme.CYBERPUNK_NEON -> Color(0xFFE040FB)
@@ -48,6 +58,8 @@ val AccentPrimary: Color get() = when {
 
 val HighlightSky: Color get() = when {
     ThemeState.isLightMode -> Color(0xFF0088FF)
+    ThemeState.isAmbientMode -> Color(0xFF818CF8) // Ambilight Indigo Glow
+    ThemeState.isCustomMode -> ThemeState.customAccentColor
     ThemeState.activeTheme == AppTheme.HIGH_CONTRAST -> Color(0xFF00FFFF)
     ThemeState.activeTheme == AppTheme.NORDIC_FROST -> Color(0xFF00B0FF)
     ThemeState.activeTheme == AppTheme.CYBERPUNK_NEON -> Color(0xFF00E5FF)
@@ -57,12 +69,14 @@ val HighlightSky: Color get() = when {
 
 val TextPrimary: Color get() = when {
     ThemeState.isLightMode -> Color(0xFF0A1626)
+    ThemeState.isAmbientMode -> Color(0xFFF8FAFC)
     ThemeState.activeTheme == AppTheme.HIGH_CONTRAST -> Color(0xFFFFFFFF)
     else -> Color(0xFFFFFFFF)
 }
 
 val TextMuted: Color get() = when {
     ThemeState.isLightMode -> Color(0xFF415266)
+    ThemeState.isAmbientMode -> Color(0xFF94A3B8)
     ThemeState.activeTheme == AppTheme.HIGH_CONTRAST -> Color(0xFFFFFFB2)
     ThemeState.activeTheme == AppTheme.NORDIC_FROST -> Color(0xFFA0C8C0)
     ThemeState.activeTheme == AppTheme.CYBERPUNK_NEON -> Color(0xFFD1B0E3)

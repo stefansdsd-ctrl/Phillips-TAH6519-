@@ -215,7 +215,8 @@ fun FullScreenMediaDashboard(viewModel: HeadphoneViewModel, settings: HeadphoneS
                         YouTubePlayer(
                             youtubeId = activeTrack.youtubeId,
                             isPlaying = isPlaying,
-                            progressSecs = trackProgressSecs
+                            progressSecs = trackProgressSecs,
+                            onVideoEnded = { viewModel.playNextTrack() }
                         )
                     }
                 } else {

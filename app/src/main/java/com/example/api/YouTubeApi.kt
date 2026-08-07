@@ -58,6 +58,10 @@ data class YouTubeOEmbedResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class PipedSearchResponse(
+    val items: List<PipedSearchItem>?
+)
+
 data class PipedSearchItem(
     val url: String?,
     val title: String?,
@@ -108,7 +112,7 @@ interface PipedApi {
     suspend fun searchMusic(
         @Query("q") query: String,
         @Query("filter") filter: String = "music_songs"
-    ): List<PipedSearchItem>
+    ): PipedSearchResponse
 
     companion object {
         private const val BASE_URL = "https://pipedapi.kavin.rocks/"
@@ -145,7 +149,8 @@ object YouTubeRssFetcher {
 
                 entryRegex.findAll(xml).forEach { match ->
                     val entryXml = match.groupValues[1]
-                    val vId = videoIdRegex.find(entryXml)?.groupValues?.get(1)?.trim() ?: ""
+                    var vId = videoIdRegex.find(entryXml)?.groupValues?.get(1)?.trim() ?: ""
+                    if (vId.contains("&")) vId = vId.substringBefore("&")
                     val rawTitle = titleRegex.find(entryXml)?.groupValues?.get(1)?.trim() ?: "Onbekend Nummer"
                     val rawAuthor = nameRegex.find(entryXml)?.groupValues?.get(1)?.trim() ?: "YouTube Music"
 

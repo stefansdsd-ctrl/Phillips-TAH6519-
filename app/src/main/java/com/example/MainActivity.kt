@@ -268,6 +268,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
         }
     }
     val isConnecting by viewModel.isConnecting.collectAsStateWithLifecycle()
+    val connectionSuccessEvent by viewModel.connectionSuccessEvent.collectAsStateWithLifecycle()
     val isAutoReconnecting by viewModel.isAutoReconnecting.collectAsStateWithLifecycle()
     val isCharging by viewModel.isCharging.collectAsStateWithLifecycle()
     val firmwareVersion by viewModel.firmwareVersion.collectAsStateWithLifecycle()
@@ -277,6 +278,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
     var activeTab by remember { mutableStateOf("dash") }
     var eqBandMode by remember { mutableStateOf("5-BAND") }
     var showPairingGuide by remember { mutableStateOf(false) }
+    var showQuickStartModal by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showHardwareManualDialog by remember { mutableStateOf(false) }
     var showBleScannerDialog by remember { mutableStateOf(false) }
@@ -316,6 +318,9 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
 
     LaunchedEffect(settings.batteryLevel, settings.connected, isCharging) {
         val connectedChanged = settings.connected != lastConnectedState
+        if (connectedChanged && settings.connected && connectionSuccessEvent == null) {
+            viewModel.triggerConnectionSuccessAnimation(settings.connectedDeviceName)
+        }
         if (settings.connected && !isCharging) {
             val wasAboveOrNull = lastWarnedBatteryLevel == null || lastWarnedBatteryLevel!! >= 20
             if (settings.batteryLevel < 20 && (wasAboveOrNull || connectedChanged)) {
@@ -339,7 +344,26 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
     }
 
     if (showPairingGuide) {
-        PairingGuideDialog(onDismiss = { showPairingGuide = false })
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showPairingGuide = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            com.example.ui.Tah6519PairingSetupScreen(
+                viewModel = viewModel,
+                onClose = { showPairingGuide = false },
+                onNavigateToTab = { targetTab ->
+                    activeTab = targetTab
+                    showPairingGuide = false
+                }
+            )
+        }
+    }
+
+    if (showQuickStartModal) {
+        com.example.ui.Tah6519QuickStartModal(
+            viewModel = viewModel,
+            onDismiss = { showQuickStartModal = false }
+        )
     }
 
     if (showSettings) {
@@ -580,6 +604,22 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                         Spacer(modifier = Modifier.width(4.dp))
 
                         IconButton(
+                            onClick = { showQuickStartModal = true },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .testTag("quick_start_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.PlayArrow,
+                                contentDescription = "Quick Start Gids",
+                                tint = HighlightSky,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        IconButton(
                             onClick = { showSettings = true },
                             modifier = Modifier
                                 .size(32.dp)
@@ -649,8 +689,18 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Text(
-                                        text = "HOE KOPPELEN?",
+                                        text = "SNELSTART GIDS",
                                         color = HighlightSky,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .clickable { showQuickStartModal = true }
+                                            .padding(4.dp)
+                                            .testTag("banner_quick_start_button")
+                                    )
+                                    Text(
+                                        text = "HOE KOPPELEN?",
+                                        color = TextMuted,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier
@@ -922,13 +972,7 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 }
                             }
                             item {
-                                BluetoothStatusIndicatorCard(viewModel, settings)
-                            }
-                            item {
-                                CompatibleBluetoothDevicesCard(viewModel)
-                            }
-                            item {
-                                TechnicalConnectionStatsCard(viewModel, settings)
+                                com.example.ui.Tah6519ConnectionDashboardCard(viewModel, settings)
                             }
                             item {
                                 val isSmartSaverActive = !settings.ancEnabled && !settings.ldacEnabled && settings.autoPowerOffMinutes == 5
@@ -960,7 +1004,39 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 )
                             }
                             item {
+                                com.example.ui.BatteryTimeRemainingCard(
+                                    viewModel = viewModel,
+                                    settings = settings,
+                                    isCharging = isCharging
+                                )
+                            }
+                            item {
+                                BluetoothStatusIndicatorCard(viewModel, settings)
+                            }
+                            item {
+                                CompatibleBluetoothDevicesCard(viewModel)
+                            }
+                            item {
+                                TechnicalConnectionStatsCard(viewModel, settings)
+                            }
+                            item {
                                 DashboardMediaWidget(viewModel, settings)
+                            }
+                            item {
+                                com.example.ui.Tah6519AncModeToggleCard(
+                                    settings = settings,
+                                    onModeChange = { mode -> viewModel.setAncMode(mode) },
+                                    onLevelChange = { level -> viewModel.setAncLevel(level) },
+                                    onTransparencyIntensityChange = { intensity -> viewModel.setTransparencyIntensity(intensity) },
+                                    onWindNoiseReductionToggle = { enabled -> viewModel.toggleWindNoiseReduction(enabled) },
+                                    onSpeakToAwarenessToggle = { enabled -> viewModel.toggleSpeakToAwareness(enabled) }
+                                )
+                            }
+                            item {
+                                com.example.ui.Tah6519MainAncModeSelectorCard(
+                                    viewModel = viewModel,
+                                    settings = settings
+                                )
                             }
                             item {
                                 DashboardQuickControls(viewModel, settings)
@@ -972,10 +1048,19 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 DashboardSoundSafetyMeter(viewModel)
                             }
                             item {
+                                com.example.ui.ListeningAnalyticsChartCard(viewModel)
+                            }
+                            item {
                                 DashboardStatsTracker()
                             }
                             item {
                                 DashboardLocatorCard(viewModel)
+                            }
+                            item {
+                                com.example.ui.BatteryPowerProfilerCard(settings, viewModel.isCharging.value)
+                            }
+                            item {
+                                com.example.ui.FindMyHeadphonesRadarCard(viewModel)
                             }
                             item {
                                 com.example.ui.FullScreenAmbientVisualizer(viewModel, settings)
@@ -989,6 +1074,23 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                         "audio" -> {
                         item {
                             FrequencyResponseGraph(bands = settings.getBands())
+                        }
+                        item {
+                            com.example.ui.EqualizerDataStoreStatusCard(
+                                settings = settings,
+                                onImportBands = { bands, name ->
+                                    viewModel.saveCustomPreset(name, bands)
+                                    viewModel.setPreset(name)
+                                }
+                            )
+                        }
+                        item {
+                            com.example.ui.SpatialReverbEngineCard(
+                                settings = settings,
+                                onRoomSizeChange = { size -> viewModel.updateSettings { it.copy(masterGain = size) } },
+                                onDecayChange = { },
+                                onPresetSelect = { env -> viewModel.setSpatialAudioMode(env) }
+                            )
                         }
                         item {
                             SectionHeader(title = "Aanbevolen Sound Profiles")
@@ -1286,217 +1388,10 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                             }
                         }
                         item {
-                            SectionHeader(title = "Actieve Ruisonderdrukking")
-                            NoiseControlToggle(
-                                activeMode = settings.ancMode,
-                                onModeChange = { viewModel.setAncMode(it) }
+                            com.example.ui.Tah6519AncController(
+                                viewModel = viewModel,
+                                settings = settings
                             )
-                        }
-
-                        if (settings.ancMode == "ON") {
-                            item {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "ANC Niveau",
-                                    color = TextMuted,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    val levels = listOf(
-                                        AncLevelData(1, "Light Focus", "Vermindert laagfrequent gebrom. Ideaal voor kantoor."),
-                                        AncLevelData(2, "Adaptief", "Past zich automatisch aan. Het beste voor reizen."),
-                                        AncLevelData(3, "Deep Silence", "Maximale 56 dB reductie. Voor lawaaierige omgevingen.")
-                                    )
-                                    levels.forEach { level ->
-                                        val isSelected = settings.ancLevel == level.level
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(
-                                                    if (isSelected) AccentPrimary.copy(alpha = 0.1f) else DarkCard,
-                                                    shape = RoundedCornerShape(12.dp)
-                                                )
-                                                .border(
-                                                    1.dp,
-                                                    if (isSelected) AccentPrimary else DarkBorder,
-                                                    shape = RoundedCornerShape(12.dp)
-                                                )
-                                                .clickable { viewModel.setAncLevel(level.level) }
-                                                .padding(16.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = level.name,
-                                                    color = if (isSelected) HighlightSky else TextPrimary,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp
-                                                )
-                                                Text(
-                                                    text = level.desc,
-                                                    color = TextMuted,
-                                                    fontSize = 11.sp,
-                                                    modifier = Modifier.padding(top = 3.dp)
-                                                )
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(16.dp)
-                                                    .border(
-                                                        2.dp,
-                                                        if (isSelected) AccentPrimary else TextMuted,
-                                                        shape = CircleShape
-                                                    )
-                                                    .padding(3.dp)
-                                            ) {
-                                                if (isSelected) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxSize()
-                                                            .background(AccentPrimary, shape = CircleShape)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            if (settings.ancLevel == 3) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(AccentPrimary.copy(alpha = 0.08f), shape = RoundedCornerShape(10.dp))
-                                            .border(1.dp, AccentPrimary.copy(alpha = 0.2f), shape = RoundedCornerShape(10.dp))
-                                            .padding(14.dp)
-                                    ) {
-                                        Text(
-                                            text = "💡 Op niveau 3 (Deep Silence): probeer de \"ANC Compensatie\" EQ-preset om de bassrespons volledig te herstellen.",
-                                            color = HighlightSky,
-                                            fontSize = 12.sp,
-                                            lineHeight = 17.sp
-                                        )
-                                    }
-                                }
-                            }
-                        } else if (settings.ancMode == "TRANSPARENCY") {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(DarkCard, shape = RoundedCornerShape(12.dp))
-                                        .border(1.dp, DarkBorder, shape = RoundedCornerShape(12.dp))
-                                        .padding(16.dp)
-                                ) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Hearing,
-                                                contentDescription = "Transparency",
-                                                tint = HighlightSky,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                            Text(
-                                                text = "Aura Sound Transparency DSP",
-                                                color = TextPrimary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp
-                                            )
-                                        }
-                                        Text(
-                                            text = "Transparency-modus vangt omgevingsgeluid op via externe microfoons en mengt dit in de audiostroom, zodat je verbonden blijft met je omgeving.",
-                                            color = TextMuted,
-                                            fontSize = 12.sp,
-                                            lineHeight = 17.sp
-                                        )
-                                        HorizontalDivider(color = DarkBorder)
-                                        
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "Omgevingsvolume Versterking",
-                                                color = TextPrimary,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            Text(
-                                                text = "Default (+3 dB)",
-                                                color = AccentPrimary,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        
-                                        var transparencyGain by remember { mutableStateOf(50f) }
-                                        PremiumSlider(
-                                            value = transparencyGain,
-                                            onValueChange = { transparencyGain = it },
-                                            valueRange = 0f..100f,
-                                            colors = SliderDefaults.colors(
-                                                activeTrackColor = HighlightSky,
-                                                inactiveTrackColor = DarkBorder,
-                                                thumbColor = HighlightSky
-                                            ),
-                                            modifier = Modifier.fillMaxWidth().testTag("transparency_gain_slider")
-                                        )
-                                        
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            var activeFocus by remember { mutableStateOf("Alle") }
-                                            listOf("Alle", "Stemmen Focus", "Veiligheid").forEach { focus ->
-                                                val isFocusSelected = activeFocus == focus
-                                                Button(
-                                                    onClick = { activeFocus = focus },
-                                                    colors = ButtonDefaults.buttonColors(
-                                                        containerColor = if (isFocusSelected) HighlightSky.copy(alpha = 0.15f) else DarkBg,
-                                                        contentColor = if (isFocusSelected) HighlightSky else TextMuted
-                                                    ),
-                                                    border = BorderStroke(
-                                                        1.dp,
-                                                        if (isFocusSelected) HighlightSky else DarkBorder
-                                                    ),
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.weight(1f).testTag("trans_focus_$focus"),
-                                                    contentPadding = PaddingValues(vertical = 4.dp)
-                                                ) {
-                                                    Text(focus, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(DarkCard, shape = RoundedCornerShape(10.dp))
-                                        .border(1.dp, DarkBorder, shape = RoundedCornerShape(10.dp))
-                                        .padding(14.dp)
-                                ) {
-                                    Text(
-                                        text = "ANC is uitgeschakeld. Het gesloten over-ear ontwerp van de TAH6519 biedt nog steeds circa 20 dB passieve geluidsisolatie.",
-                                        color = TextMuted,
-                                        fontSize = 12.sp,
-                                        lineHeight = 17.sp
-                                    )
-                                }
-                            }
                         }
                         item {
                             SectionHeader(title = "Geluidsverbeteringen")
@@ -1697,6 +1592,14 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                             }
                         }
 
+                        // Dedicated Headphone Settings Menu
+                        item {
+                            com.example.ui.Tah6519HeadphoneSettingsMenuCard(
+                                viewModel = viewModel,
+                                settings = settings
+                            )
+                        }
+
                         // Battery & Power Control Card
                         item {
                             val isSmartSaverActive = !settings.ancEnabled && !settings.ldacEnabled && settings.autoPowerOffMinutes == 5
@@ -1726,6 +1629,14 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 onFetchBattery = { viewModel.fetchBatteryLevel() },
                                 settings = settings,
                                 viewModel = viewModel
+                            )
+                        }
+
+                        item {
+                            com.example.ui.BatteryTimeRemainingCard(
+                                viewModel = viewModel,
+                                settings = settings,
+                                isCharging = isCharging
                             )
                         }
 
@@ -2745,6 +2656,13 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                     }
                 }
             }
+        }
+
+        connectionSuccessEvent?.let { devName ->
+            com.example.ui.Tah6519ConnectionAnimationOverlay(
+                deviceName = devName,
+                onDismiss = { viewModel.dismissConnectionSuccessEvent() }
+            )
         }
     }
 }
@@ -14328,6 +14246,7 @@ fun SettingsDialog(
     val firmwareVersion by viewModel.firmwareVersion.collectAsStateWithLifecycle()
     val serialNumber by viewModel.serialNumber.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val lastPollTime by viewModel.lastFirmwarePollTime.collectAsStateWithLifecycle()
     var showResetConfirm by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
@@ -14664,62 +14583,131 @@ fun SettingsDialog(
                             }
                         }
 
-                        // 3-way Theme Mode Segmented Selector (System / Dark / Light)
+                        // 4-way Theme Mode Segmented Selector (Licht / Ambient / Custom / Donker)
                         val currentMode by viewModel.currentThemeMode.collectAsStateWithLifecycle()
-                        
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(DarkBg, shape = RoundedCornerShape(10.dp))
-                                .border(1.dp, DarkBorder, shape = RoundedCornerShape(10.dp))
-                                .padding(3.dp)
-                                .testTag("settings_theme_mode_selector"),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            val modeOptions = listOf(
-                                Triple(com.example.ui.theme.ThemeMode.SYSTEM, "Systeem", Icons.Filled.BrightnessAuto),
-                                Triple(com.example.ui.theme.ThemeMode.DARK, "Donker", Icons.Filled.NightsStay),
-                                Triple(com.example.ui.theme.ThemeMode.LIGHT, "Licht", Icons.Filled.WbSunny)
-                            )
+                        val customHex by viewModel.customAccentHex.collectAsStateWithLifecycle()
 
-                            modeOptions.forEach { (mode, label, icon) ->
-                                val isSelected = currentMode == mode
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .background(
-                                            color = if (isSelected) HighlightSky.copy(alpha = 0.2f) else Color.Transparent,
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .border(
-                                            width = if (isSelected) 1.dp else 0.dp,
-                                            color = if (isSelected) HighlightSky else Color.Transparent,
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            viewModel.setThemeMode(mode)
-                                        }
-                                        .padding(vertical = 8.dp)
-                                        .testTag("theme_mode_${mode.name.lowercase()}_button"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(DarkBg, shape = RoundedCornerShape(10.dp))
+                                    .border(1.dp, DarkBorder, shape = RoundedCornerShape(10.dp))
+                                    .padding(3.dp)
+                                    .testTag("settings_theme_mode_selector"),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val modeOptions = listOf(
+                                    Triple(com.example.ui.theme.ThemeMode.LIGHT, "Licht", Icons.Filled.WbSunny),
+                                    Triple(com.example.ui.theme.ThemeMode.AMBIENT, "Ambient", Icons.Filled.BlurOn),
+                                    Triple(com.example.ui.theme.ThemeMode.CUSTOM, "Custom", Icons.Filled.Palette),
+                                    Triple(com.example.ui.theme.ThemeMode.DARK, "Donker", Icons.Filled.NightsStay)
+                                )
+
+                                modeOptions.forEach { (mode, label, icon) ->
+                                    val isSelected = currentMode == mode
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(
+                                                color = if (isSelected) HighlightSky.copy(alpha = 0.2f) else Color.Transparent,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .border(
+                                                width = if (isSelected) 1.dp else 0.dp,
+                                                color = if (isSelected) HighlightSky else Color.Transparent,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                viewModel.setThemeMode(mode)
+                                            }
+                                            .padding(vertical = 8.dp)
+                                            .testTag("theme_mode_${mode.name.lowercase()}_button"),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = null,
-                                            tint = if (isSelected) HighlightSky else TextMuted,
-                                            modifier = Modifier.size(13.dp)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = null,
+                                                tint = if (isSelected) HighlightSky else TextMuted,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = label,
+                                                color = if (isSelected) TextPrimary else TextMuted,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (currentMode == com.example.ui.theme.ThemeMode.CUSTOM) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(DarkBg, shape = RoundedCornerShape(8.dp))
+                                        .border(1.dp, HighlightSky.copy(alpha = 0.4f), shape = RoundedCornerShape(8.dp))
+                                        .padding(10.dp)
+                                        .testTag("custom_theme_accent_picker"),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Aangepaste Kleuraccenten (Philips Signature)",
+                                        color = TextPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        val customSwatches = listOf(
+                                            "#0066FF" to "Philips Blauw",
+                                            "#00E5FF" to "Ambilight Cyan",
+                                            "#E040FB" to "Cyber Neon",
+                                            "#FFAB00" to "Warm Goud",
+                                            "#00E676" to "Nordic Mint",
+                                            "#FF3D00" to "Vivid Oranje"
                                         )
-                                        Text(
-                                            text = label,
-                                            color = if (isSelected) TextPrimary else TextMuted,
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
+                                        customSwatches.forEach { (hex, name) ->
+                                            val swatchColor = try {
+                                                Color(android.graphics.Color.parseColor(hex))
+                                            } catch (e: Exception) {
+                                                Color(0xFF00E5FF)
+                                            }
+                                            val isSelected = customHex.equals(hex, ignoreCase = true)
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clip(CircleShape)
+                                                    .background(swatchColor)
+                                                    .border(
+                                                        width = if (isSelected) 2.dp else 1.dp,
+                                                        color = if (isSelected) TextPrimary else Color.Transparent,
+                                                        shape = CircleShape
+                                                    )
+                                                    .clickable {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        viewModel.setCustomAccentHex(hex)
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (isSelected) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Check,
+                                                        contentDescription = name,
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -14790,6 +14778,94 @@ fun SettingsDialog(
                     }
                 }
 
+                // Multipoint Pairing Toggle Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_multipoint_card"),
+                    colors = CardDefaults.cardColors(containerColor = DarkCard),
+                    border = BorderStroke(1.dp, if (settings.multipointEnabled) HighlightSky.copy(alpha = 0.3f) else DarkBorder),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(
+                                            if (settings.multipointEnabled) HighlightSky.copy(alpha = 0.15f) else DarkBg,
+                                            shape = CircleShape
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (settings.multipointEnabled) HighlightSky.copy(alpha = 0.4f) else DarkBorder,
+                                            shape = CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Devices,
+                                        contentDescription = null,
+                                        tint = if (settings.multipointEnabled) HighlightSky else TextMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Multipoint Koppeling",
+                                        color = TextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (settings.multipointEnabled) "Verbonden met 2 apparaten tegelijk" else "Uitgeschakeld (Enkel apparaat)",
+                                        color = if (settings.multipointEnabled) StatusSuccess else TextMuted,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = settings.multipointEnabled,
+                                onCheckedChange = { enabled ->
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.toggleMultipoint(enabled)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = HighlightSky,
+                                    checkedTrackColor = AccentPrimary,
+                                    uncheckedThumbColor = TextMuted,
+                                    uncheckedTrackColor = DarkBg
+                                ),
+                                modifier = Modifier
+                                    .scale(0.85f)
+                                    .testTag("multipoint_pairing_switch")
+                            )
+                        }
+
+                        Text(
+                            text = "Schakel Multipoint Koppeling in om naadloos te schakelen tussen twee actieve Bluetooth-bronnen (bijv. telefoon en laptop) zonder opnieuw te hoeven koppelen.",
+                            color = TextMuted,
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+
                 // Intelligent Battery Preservation Card
                 IntelligentBatteryPreservationCard(
                     settings = settings,
@@ -14857,7 +14933,7 @@ fun SettingsDialog(
 
                         HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
 
-                        // Firmware Version Row
+                        // Firmware Version Info Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -14868,17 +14944,24 @@ fun SettingsDialog(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.Info,
+                                    imageVector = Icons.Filled.SystemUpdate,
                                     contentDescription = null,
                                     tint = HighlightSky,
                                     modifier = Modifier.size(16.dp)
                                 )
-                                Text(
-                                    text = "Firmware-versie",
-                                    color = TextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Column {
+                                    Text(
+                                        text = "Firmware-versie",
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "HW Rev: 2.0 • Build 2026.08-OTA",
+                                        color = TextMuted,
+                                        fontSize = 9.sp
+                                    )
+                                }
                             }
                             
                             Box(
@@ -14937,56 +15020,298 @@ fun SettingsDialog(
                             }
                         }
 
-                        HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
-
-                        Text(
-                            text = "Als er nieuwe updates beschikbaar zijn met geluidskwaliteit- en prestatieverbeteringen, kun je deze installeren in de 'Device' tab.",
-                            color = TextMuted,
-                            fontSize = 10.sp,
-                            lineHeight = 14.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Button(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.checkForUpdates()
-                            },
-                            enabled = updateState !is UpdateState.Checking && updateState !is UpdateState.Updating,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = HighlightSky.copy(alpha = 0.15f),
-                                contentColor = HighlightSky,
-                                disabledContainerColor = DarkBg,
-                                disabledContentColor = TextMuted
-                            ),
-                            border = BorderStroke(1.dp, if (updateState !is UpdateState.Checking && updateState !is UpdateState.Updating) HighlightSky.copy(alpha = 0.4f) else DarkBorder),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(38.dp)
-                                .testTag("settings_check_updates_button")
-                        ) {
-                            if (updateState is UpdateState.Checking) {
-                                Box(modifier = Modifier.size(16.dp)) {
-                                    CircularProgressIndicator(
-                                        color = TextMuted,
-                                        strokeWidth = 2.dp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Controleren...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            } else {
+                        if (!lastPollTime.isNullOrEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    text = when (updateState) {
-                                        is UpdateState.UpToDate -> "Je bent up-to-date"
-                                        is UpdateState.UpdateAvailable -> "Update Beschikbaar"
-                                        is UpdateState.UpdateComplete -> "Update Voltooid"
-                                        else -> "Controleer op updates"
-                                    },
-                                    fontSize = 11.sp, 
+                                    text = "Laatst gecontroleerd",
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = lastPollTime.orEmpty(),
+                                    color = TextMuted,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+                            }
+                        }
+
+                        HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+
+                        // Firmware Updates Controls & Loading Progress Section
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            when (val state = updateState) {
+                                is UpdateState.Checking -> {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(DarkBg, shape = RoundedCornerShape(10.dp))
+                                            .border(1.dp, HighlightSky.copy(alpha = 0.3f), shape = RoundedCornerShape(10.dp))
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    color = HighlightSky,
+                                                    strokeWidth = 2.dp,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Text(
+                                                    text = "Controleren op updates...",
+                                                    color = TextPrimary,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            Text(
+                                                text = "OTA Server API",
+                                                color = HighlightSky,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+
+                                        LinearProgressIndicator(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(6.dp)
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .testTag("firmware_checking_progress_bar"),
+                                            color = HighlightSky,
+                                            trackColor = DarkBorder
+                                        )
+
+                                        Text(
+                                            text = "Verbinding maken met Philips Firmware Server...",
+                                            color = TextMuted,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+
+                                is UpdateState.Updating -> {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(DarkBg, shape = RoundedCornerShape(10.dp))
+                                            .border(1.dp, AccentPrimary.copy(alpha = 0.4f), shape = RoundedCornerShape(10.dp))
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = state.statusMessage,
+                                                color = AccentPrimary,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "${state.progress.toInt()}%",
+                                                color = HighlightSky,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                        }
+
+                                        LinearProgressIndicator(
+                                            progress = { state.progress / 100f },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(8.dp)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .testTag("firmware_updating_progress_bar"),
+                                            color = AccentPrimary,
+                                            trackColor = DarkBorder
+                                        )
+
+                                        Text(
+                                            text = "Schakel de koptelefoon niet uit tijdens de installatie.",
+                                            color = TextMuted,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+
+                                is UpdateState.UpdateAvailable -> {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(StatusSuccess.copy(alpha = 0.08f), shape = RoundedCornerShape(10.dp))
+                                            .border(1.dp, StatusSuccess.copy(alpha = 0.3f), shape = RoundedCornerShape(10.dp))
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Nieuwe Firmware Beschikbaar (${state.version})",
+                                                color = StatusSuccess,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        state.changelog.forEach { change ->
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalAlignment = Alignment.Top
+                                            ) {
+                                                Text("•", color = StatusSuccess, fontSize = 10.sp)
+                                                Text(change, color = TextPrimary, fontSize = 10.sp, lineHeight = 13.sp)
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(2.dp))
+
+                                        Button(
+                                            onClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                viewModel.startUpdate()
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = StatusSuccess),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(36.dp)
+                                                .testTag("settings_install_update_button")
+                                        ) {
+                                            Text("Update Nu Installeren", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                is UpdateState.UpToDate -> {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(StatusSuccess.copy(alpha = 0.08f), shape = RoundedCornerShape(8.dp))
+                                            .border(1.dp, StatusSuccess.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp))
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.CheckCircle,
+                                            contentDescription = "Up to date",
+                                            tint = StatusSuccess,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Je Philips TAH6519 is up-to-date ($firmwareVersion)",
+                                            color = StatusSuccess,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+
+                                is UpdateState.UpdateComplete -> {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(StatusSuccess.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp))
+                                            .border(1.dp, StatusSuccess, shape = RoundedCornerShape(10.dp))
+                                            .padding(12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.CheckCircle,
+                                            contentDescription = "Voltooid",
+                                            tint = StatusSuccess,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Text(
+                                            text = "Firmware Succesvol Geüpdatet naar ${state.newVersion}!",
+                                            color = StatusSuccess,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Button(
+                                            onClick = { viewModel.resetUpdateState() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = DarkBg),
+                                            border = BorderStroke(1.dp, DarkBorder),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("OK", color = TextPrimary, fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+
+                                else -> {
+                                    Text(
+                                        text = "Als er nieuwe updates beschikbaar zijn met geluidskwaliteit- en prestatieverbeteringen, kun je deze direct downloaden en installeren.",
+                                        color = TextMuted,
+                                        fontSize = 10.sp,
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.checkForUpdates()
+                                },
+                                enabled = updateState !is UpdateState.Checking && updateState !is UpdateState.Updating,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = HighlightSky.copy(alpha = 0.15f),
+                                    contentColor = HighlightSky,
+                                    disabledContainerColor = DarkBg,
+                                    disabledContentColor = TextMuted
+                                ),
+                                border = BorderStroke(1.dp, if (updateState !is UpdateState.Checking && updateState !is UpdateState.Updating) HighlightSky.copy(alpha = 0.4f) else DarkBorder),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(38.dp)
+                                    .testTag("settings_check_updates_button")
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = when (updateState) {
+                                            is UpdateState.Checking -> "Controleren op updates..."
+                                            is UpdateState.Updating -> "Update wordt geïnstalleerd..."
+                                            is UpdateState.UpToDate -> "Opnieuw Controleren"
+                                            is UpdateState.UpdateAvailable -> "Controleer Opnieuw"
+                                            is UpdateState.UpdateComplete -> "Controleer op Updates"
+                                            else -> "Controleer op Updates"
+                                        },
+                                        fontSize = 11.sp, 
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
@@ -16032,6 +16357,49 @@ fun FirmwareUpdatePromptDialog(
                                 Text(
                                     text = bullet,
                                     color = TextMuted,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(StatusYellow.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp))
+                        .border(1.dp, StatusYellow.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "VOORBEREIDING:",
+                            color = StatusYellow,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        val steps = listOf(
+                            "Zorg dat je koptelefoon minimaal 50% is opgeladen.",
+                            "Houd de koptelefoon dichtbij je apparaat.",
+                            "Sluit de app niet af tijdens de update."
+                        )
+                        steps.forEachIndexed { index, step ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = "${index + 1}.",
+                                    color = StatusYellow,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = step,
+                                    color = TextPrimary,
                                     fontSize = 11.sp,
                                     lineHeight = 15.sp
                                 )
