@@ -8,7 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ListItem
@@ -17,7 +21,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.example.headphonecompanion.audio.EqualizerManager
 import com.example.headphonecompanion.bluetooth.BatteryGattReader
+import com.example.headphonecompanion.dsp.ParametricEq
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -44,7 +51,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    MainScreen(reader, { perms -> requestPermissionLauncher.launch(perms.associateWith { true }) }, permissions.toTypedArray())
+                    AppContent(reader, { perms -> requestPermissionLauncher.launch(perms.associateWith { true }) }, permissions.toTypedArray())
                 }
             }
         }
@@ -57,10 +64,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(reader: BatteryGattReader, requestPermission: (Array<String>) -> Unit, perms: Array<String>) {
+fun AppContent(reader: BatteryGattReader, requestPermission: (Array<String>) -> Unit, perms: Array<String>) {
     val scope = rememberCoroutineScope()
     var devices by remember { mutableStateOf<List<android.bluetooth.BluetoothDevice>>(emptyList()) }
     var selectedBattery by remember { mutableStateOf<Int?>(null) }
+    var showEq by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         devices = reader.listPairedAudioDevices()
@@ -74,12 +82,16 @@ fun MainScreen(reader: BatteryGattReader, requestPermission: (Array<String>) -> 
         }
     }
 
-    Column {
+    Column(modifier = Modifier.padding(16.dp)) {
         Button(onClick = { requestPermission(perms) }) {
             Text("Grant Bluetooth permissions")
         }
 
-        Text("Paired devices:")
+        Button(onClick = { showEq = !showEq }, modifier = Modifier.padding(top = 8.dp)) {
+            Text(if (showEq) "Hide EQ" else "Open EQ")
+        }
+
+        Text("Paired devices:", modifier = Modifier.padding(top = 12.dp))
         LazyColumn {
             items(devices.size) { idx ->
                 val d = devices[idx]
@@ -93,7 +105,16 @@ fun MainScreen(reader: BatteryGattReader, requestPermission: (Array<String>) -> 
         }
 
         selectedBattery?.let {
-            Text("Battery level: $it%")
-        } ?: Text("No battery reading yet")
+            Text("Battery level: $it%", modifier = Modifier.padding(top = 8.dp))
+        } ?: Text("No battery reading yet", modifier = Modifier.padding(top = 8.dp))
+
+        if (showEq) {
+            EqScreen(onApply = { eq ->
+                // Apply using Android Equalizer on default audio session (0).
+                // For best results, pass the active player's audioSessionId.
+                val manager = EqualizerManager(0)
+                manager.applyParametricEq(eq)
+            })
+        }
     }
 }
