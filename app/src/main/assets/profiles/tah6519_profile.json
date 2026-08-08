@@ -1,0 +1,9 @@
+{
+  "vendor": "Philips",
+  "model": "TAH6519",
+  "measured_by": "Philips (manufacturer spec)",
+  "measurement_date": null,
+  "frequency_response_url": null,
+  "compensation_type": null,
+  "compensation_data": "Manufacturer does not publish lab frequency-response plots. Use measured FR files (CSV/JSON) when available."
+}
