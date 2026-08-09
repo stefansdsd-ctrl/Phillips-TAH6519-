@@ -8,11 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ListItem
@@ -27,13 +24,17 @@ import com.example.headphonecompanion.bluetooth.BatteryGattReader
 import com.example.headphonecompanion.dsp.ParametricEq
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import androidx.media3.exoplayer.ExoPlayer
 
 class MainActivity : ComponentActivity() {
     private lateinit var reader: BatteryGattReader
+    private var player: ExoPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         reader = BatteryGattReader(applicationContext)
+
+        player = ExoPlayer.Builder(this).build()
 
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -51,7 +52,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppContent(reader, { perms -> requestPermissionLauncher.launch(perms.associateWith { true }) }, permissions.toTypedArray())
+                    AppContent(reader, { perms -> requestPermissionLauncher.launch(perms.associateWith { true }) }, permissions.toTypedArray(), player)
                 }
             }
         }
@@ -60,11 +61,12 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         reader.close()
+        player?.release()
     }
 }
 
 @Composable
-fun AppContent(reader: BatteryGattReader, requestPermission: (Array<String>) -> Unit, perms: Array<String>) {
+fun AppContent(reader: BatteryGattReader, requestPermission: (Array<String>) -> Unit, perms: Array<String>, player: ExoPlayer?) {
     val scope = rememberCoroutineScope()
     var devices by remember { mutableStateOf<List<android.bluetooth.BluetoothDevice>>(emptyList()) }
     var selectedBattery by remember { mutableStateOf<Int?>(null) }
@@ -110,9 +112,9 @@ fun AppContent(reader: BatteryGattReader, requestPermission: (Array<String>) -> 
 
         if (showEq) {
             EqScreen(onApply = { eq ->
-                // Apply using Android Equalizer on default audio session (0).
-                // For best results, pass the active player's audioSessionId.
-                val manager = EqualizerManager(0)
+                // Use active player's audioSessionId if available, otherwise fallback to 0
+                val audioSessionId = player?.audioSessionId ?: 0
+                val manager = EqualizerManager(audioSessionId)
                 manager.applyParametricEq(eq)
             })
         }
