@@ -24,7 +24,7 @@ import com.example.headphonecompanion.bluetooth.BatteryGattReader
 import com.example.headphonecompanion.dsp.ParametricEq
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import androidx.media3.exoplayer.ExoPlayer
+import com.google.android.exoplayer2.ExoPlayer
 
 class MainActivity : ComponentActivity() {
     private lateinit var reader: BatteryGattReader
