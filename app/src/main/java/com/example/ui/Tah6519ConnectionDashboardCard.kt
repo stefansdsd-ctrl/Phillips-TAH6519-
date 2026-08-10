@@ -80,18 +80,18 @@ fun Tah6519ConnectionDashboardCard(
             .testTag("tah6519_connection_status_dashboard"),
         colors = CardDefaults.cardColors(containerColor = DarkPanel),
         border = BorderStroke(
-            width = 1.dp,
+            width = 1.25.dp,
             brush = Brush.horizontalGradient(
                 colors = listOf(
-                    DarkBorder,
-                    if (settings.connected) StatusSuccess.copy(alpha = 0.5f)
-                    else if (isScanning) HighlightSky.copy(alpha = 0.6f)
-                    else StatusYellow.copy(alpha = 0.4f),
-                    DarkBorder
+                    AccentPrimary.copy(alpha = 0.3f),
+                    if (settings.connected) StatusSuccess.copy(alpha = 0.6f)
+                    else if (isScanning) HighlightSky.copy(alpha = 0.7f)
+                    else StatusYellow.copy(alpha = 0.5f),
+                    AccentPrimary.copy(alpha = 0.3f)
                 )
             )
         ),
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(22.dp)
     ) {
         Column(
             modifier = Modifier

@@ -69,7 +69,7 @@ data class CompatibleBluetoothDevice(
     val isPhilips: Boolean = false
 )
 
-class HeadphoneViewModel(application: Application, private val repository: HeadphoneRepository) : ViewModel() {
+class HeadphoneViewModel(private val application: Application, private val repository: HeadphoneRepository) : ViewModel() {
     val bleManager = com.example.bluetooth.BluetoothLEManager.getInstance(application)
     val exoPlayerController = ExoPlayerController.getInstance(application)
     val youtubeApiController = YouTubeApiController.getInstance(application)
@@ -1072,10 +1072,68 @@ class HeadphoneViewModel(application: Application, private val repository: Headp
         }
     }
 
+    private var lowBatteryNotified = false
+
     fun updateBatteryLevel(level: Int) {
         val coerced = level.coerceIn(0, 100)
         updateSettings { current ->
             current.copy(batteryLevel = coerced)
+        }
+        checkLowBatteryNotification(coerced)
+    }
+
+    private fun checkLowBatteryNotification(batteryLevel: Int) {
+        if (batteryLevel <= 20 && !isCharging.value) {
+            if (!lowBatteryNotified) {
+                lowBatteryNotified = true
+                sendLowBatterySystemNotification(batteryLevel)
+            }
+        } else if (batteryLevel > 20 || isCharging.value) {
+            lowBatteryNotified = false
+        }
+    }
+
+    private fun sendLowBatterySystemNotification(batteryLevel: Int) {
+        try {
+            val context = application
+            val channelId = "philips_tah6519_low_battery_channel"
+            val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                ?: return
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val channel = android.app.NotificationChannel(
+                    channelId,
+                    "Batterij Waarschuwingen",
+                    android.app.NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Meldingen voor lage accucapaciteit van de Philips TAH6519 koptelefoon"
+                    enableVibration(true)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val intent = android.content.Intent(context, com.example.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val pendingIntent = android.app.PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(android.R.drawable.stat_sys_warning)
+                .setContentTitle("Lage accuspanning TAH6519 (${batteryLevel}%)")
+                .setContentText("De accu van je Philips TAH6519 is onder 20% gedaald. Sluit de lader aan om plotseling uitvallen te voorkomen.")
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+
+            notificationManager.notify(8002, notification)
+        } catch (e: Exception) {
+            // Safe fallback
         }
     }
 

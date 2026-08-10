@@ -1023,6 +1023,18 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 DashboardMediaWidget(viewModel, settings)
                             }
                             item {
+                                com.example.ui.ContextAwareAncManagerCard(viewModel = viewModel, settings = settings)
+                            }
+                            item {
+                                com.example.ui.FiveMicCallClarityCard(viewModel = viewModel, settings = settings)
+                            }
+                            item {
+                                com.example.ui.Tah6519FirmwareUpdateCard(viewModel = viewModel, settings = settings)
+                            }
+                            item {
+                                com.example.ui.BatteryHistoryChartCard(viewModel = viewModel, settings = settings)
+                            }
+                            item {
                                 com.example.ui.Tah6519AncModeToggleCard(
                                     settings = settings,
                                     onModeChange = { mode -> viewModel.setAncMode(mode) },
