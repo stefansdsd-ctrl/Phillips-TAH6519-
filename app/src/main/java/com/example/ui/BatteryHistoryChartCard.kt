@@ -84,18 +84,23 @@ import com.example.ui.theme.StatusYellow
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 
+enum class BatteryChartTimeframe {
+    HOURS_24, DAYS_7
+}
+
 enum class BatteryChartStyle {
     BAR, LINE
 }
 
-data class DailyBatteryRecord(
-    val dayLabel: String,
-    val dateStr: String,
+data class BatteryRecord(
+    val timeLabel: String,       // e.g. "09:00" or "Ma"
+    val fullDateStr: String,     // e.g. "Vandaag 09:00" or "01 Aug"
+    val batteryLevelPercent: Int, // Current battery level at that timestamp e.g. 75%
     val drainPercent: Int,      // Batterijverbruik %
     val rechargedPercent: Int,  // Opgeladen %
     val playTimeHours: Float,   // Gebruiksuren
     val ancActivePercent: Int,  // % van tijd met ANC aan
-    val peakDrainRate: String   // Peak verbruik b.v. "12%/uur"
+    val peakDrainRate: String   // Peak verbruik b.v. "8.2%/u"
 )
 
 @Composable
@@ -105,23 +110,41 @@ fun BatteryHistoryChartCard(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    var chartStyle by remember { mutableStateOf(BatteryChartStyle.BAR) }
-    var selectedDayIndex by remember { mutableIntStateOf(6) } // Standaard vandaag (Zondag/Laatste dag)
+    var timeframe by remember { mutableStateOf(BatteryChartTimeframe.HOURS_24) }
+    var chartStyle by remember { mutableStateOf(BatteryChartStyle.LINE) }
+    var selectedIndex by remember { mutableIntStateOf(7) }
 
-    // 7-Dagen Geschiedenis Data
-    val batteryHistory = remember {
+    // 24-Uur Geschiedenis Data (met intervallen van 3 uur)
+    val hours24History = remember {
         listOf(
-            DailyBatteryRecord("Ma", "01 Aug", drainPercent = 45, rechargedPercent = 0, playTimeHours = 6.5f, ancActivePercent = 85, peakDrainRate = "8.2%/u"),
-            DailyBatteryRecord("Di", "02 Aug", drainPercent = 30, rechargedPercent = 50, playTimeHours = 4.2f, ancActivePercent = 60, peakDrainRate = "7.1%/u"),
-            DailyBatteryRecord("Wo", "03 Aug", drainPercent = 65, rechargedPercent = 0, playTimeHours = 8.8f, ancActivePercent = 90, peakDrainRate = "9.5%/u"),
-            DailyBatteryRecord("Do", "04 Aug", drainPercent = 20, rechargedPercent = 80, playTimeHours = 3.0f, ancActivePercent = 40, peakDrainRate = "6.0%/u"),
-            DailyBatteryRecord("Vr", "05 Aug", drainPercent = 55, rechargedPercent = 0, playTimeHours = 7.4f, ancActivePercent = 95, peakDrainRate = "8.8%/u"),
-            DailyBatteryRecord("Za", "06 Aug", drainPercent = 15, rechargedPercent = 0, playTimeHours = 2.1f, ancActivePercent = 30, peakDrainRate = "5.5%/u"),
-            DailyBatteryRecord("Zo", "07 Aug", drainPercent = 40, rechargedPercent = 30, playTimeHours = 5.8f, ancActivePercent = 75, peakDrainRate = "7.8%/u")
+            BatteryRecord("00:00", "Vandaag 00:00", batteryLevelPercent = 100, drainPercent = 0, rechargedPercent = 0, playTimeHours = 0.0f, ancActivePercent = 0, peakDrainRate = "0.0%/u"),
+            BatteryRecord("03:00", "Vandaag 03:00", batteryLevelPercent = 95, drainPercent = 5, rechargedPercent = 0, playTimeHours = 0.5f, ancActivePercent = 0, peakDrainRate = "1.6%/u"),
+            BatteryRecord("06:00", "Vandaag 06:00", batteryLevelPercent = 92, drainPercent = 3, rechargedPercent = 0, playTimeHours = 0.8f, ancActivePercent = 20, peakDrainRate = "1.0%/u"),
+            BatteryRecord("09:00", "Vandaag 09:00", batteryLevelPercent = 78, drainPercent = 14, rechargedPercent = 0, playTimeHours = 2.5f, ancActivePercent = 85, peakDrainRate = "5.6%/u"),
+            BatteryRecord("12:00", "Vandaag 12:00", batteryLevelPercent = 64, drainPercent = 14, rechargedPercent = 0, playTimeHours = 2.2f, ancActivePercent = 90, peakDrainRate = "6.3%/u"),
+            BatteryRecord("15:00", "Vandaag 15:00", batteryLevelPercent = 52, drainPercent = 12, rechargedPercent = 0, playTimeHours = 1.8f, ancActivePercent = 70, peakDrainRate = "6.6%/u"),
+            BatteryRecord("18:00", "Vandaag 18:00", batteryLevelPercent = 88, drainPercent = 0, rechargedPercent = 40, playTimeHours = 0.2f, ancActivePercent = 0, peakDrainRate = "0.0%/u"),
+            BatteryRecord("21:00", "Vandaag 21:00", batteryLevelPercent = 74, drainPercent = 14, rechargedPercent = 0, playTimeHours = 2.1f, ancActivePercent = 80, peakDrainRate = "6.6%/u"),
+            BatteryRecord("24:00", "Vandaag 24:00", batteryLevelPercent = 68, drainPercent = 6, rechargedPercent = 0, playTimeHours = 1.0f, ancActivePercent = 60, peakDrainRate = "6.0%/u")
         )
     }
 
-    val selectedRecord = batteryHistory.getOrNull(selectedDayIndex) ?: batteryHistory.last()
+    // 7-Dagen Geschiedenis Data
+    val days7History = remember {
+        listOf(
+            BatteryRecord("Ma", "01 Aug", batteryLevelPercent = 55, drainPercent = 45, rechargedPercent = 0, playTimeHours = 6.5f, ancActivePercent = 85, peakDrainRate = "8.2%/u"),
+            BatteryRecord("Di", "02 Aug", batteryLevelPercent = 70, drainPercent = 30, rechargedPercent = 50, playTimeHours = 4.2f, ancActivePercent = 60, peakDrainRate = "7.1%/u"),
+            BatteryRecord("Wo", "03 Aug", batteryLevelPercent = 35, drainPercent = 65, rechargedPercent = 0, playTimeHours = 8.8f, ancActivePercent = 90, peakDrainRate = "9.5%/u"),
+            BatteryRecord("Do", "04 Aug", batteryLevelPercent = 80, drainPercent = 20, rechargedPercent = 80, playTimeHours = 3.0f, ancActivePercent = 40, peakDrainRate = "6.0%/u"),
+            BatteryRecord("Vr", "05 Aug", batteryLevelPercent = 45, drainPercent = 55, rechargedPercent = 0, playTimeHours = 7.4f, ancActivePercent = 95, peakDrainRate = "8.8%/u"),
+            BatteryRecord("Za", "06 Aug", batteryLevelPercent = 85, drainPercent = 15, rechargedPercent = 0, playTimeHours = 2.1f, ancActivePercent = 30, peakDrainRate = "5.5%/u"),
+            BatteryRecord("Zo", "07 Aug", batteryLevelPercent = 68, drainPercent = 40, rechargedPercent = 30, playTimeHours = 5.8f, ancActivePercent = 75, peakDrainRate = "7.8%/u")
+        )
+    }
+
+    val activeDataset = if (timeframe == BatteryChartTimeframe.HOURS_24) hours24History else days7History
+    val safeIndex = selectedIndex.coerceIn(0, activeDataset.size - 1)
+    val selectedRecord = activeDataset[safeIndex]
 
     Card(
         modifier = modifier
@@ -137,90 +160,156 @@ fun BatteryHistoryChartCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            // Header: Title & Controls
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(StatusSuccess.copy(alpha = 0.15f))
-                            .border(1.dp, StatusSuccess.copy(alpha = 0.4f), CircleShape),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.History,
-                            contentDescription = "Battery History",
-                            tint = StatusSuccess,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(StatusSuccess.copy(alpha = 0.15f))
+                                .border(1.dp, StatusSuccess.copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.History,
+                                contentDescription = "Battery History",
+                                tint = StatusSuccess,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = if (timeframe == BatteryChartTimeframe.HOURS_24) "24-Uur Batterijverloop" else "7-Dagen Batterijhistorie",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Philips TAH6519 Ontlaadkurve & Laadpulsen",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
 
-                    Column {
-                        Text(
-                            text = "Batterijverbruik (7-Dagen)",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = "Philips TAH6519 Accuhistorie & Laadcycli",
-                            color = TextMuted,
-                            fontSize = 10.sp
-                        )
+                    // Chart Style Selector
+                    Row(
+                        modifier = Modifier
+                            .background(DarkBg, shape = RoundedCornerShape(8.dp))
+                            .border(1.dp, DarkBorder, shape = RoundedCornerShape(8.dp))
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (chartStyle == BatteryChartStyle.BAR) StatusSuccess.copy(alpha = 0.25f) else Color.Transparent)
+                                .clickable {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                    chartStyle = BatteryChartStyle.BAR
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .testTag("chart_type_bar_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.BarChart,
+                                contentDescription = "Bar Chart",
+                                tint = if (chartStyle == BatteryChartStyle.BAR) StatusSuccess else TextMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (chartStyle == BatteryChartStyle.LINE) StatusSuccess.copy(alpha = 0.25f) else Color.Transparent)
+                                .clickable {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                    chartStyle = BatteryChartStyle.LINE
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .testTag("chart_type_line_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ShowChart,
+                                contentDescription = "Line Chart",
+                                tint = if (chartStyle == BatteryChartStyle.LINE) StatusSuccess else TextMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
 
-                // Chart Style Selector
+                // Timeframe Selector Tabs (24-Uur vs 7-Dagen)
                 Row(
                     modifier = Modifier
-                        .background(DarkBg, shape = RoundedCornerShape(8.dp))
-                        .border(1.dp, DarkBorder, shape = RoundedCornerShape(8.dp))
-                        .padding(2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        .fillMaxWidth()
+                        .background(DarkBg, shape = RoundedCornerShape(10.dp))
+                        .border(1.dp, DarkBorder, shape = RoundedCornerShape(10.dp))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (chartStyle == BatteryChartStyle.BAR) StatusSuccess.copy(alpha = 0.25f) else Color.Transparent)
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (timeframe == BatteryChartTimeframe.HOURS_24) AccentPrimary.copy(alpha = 0.2f) else Color.Transparent)
+                            .border(
+                                1.dp,
+                                if (timeframe == BatteryChartTimeframe.HOURS_24) AccentPrimary.copy(alpha = 0.5f) else Color.Transparent,
+                                RoundedCornerShape(8.dp)
+                            )
                             .clickable {
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                chartStyle = BatteryChartStyle.BAR
+                                timeframe = BatteryChartTimeframe.HOURS_24
+                                selectedIndex = 7
                             }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .testTag("chart_type_bar_button")
+                            .padding(vertical = 6.dp)
+                            .testTag("timeframe_24_hours_button"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.BarChart,
-                            contentDescription = "Bar Chart",
-                            tint = if (chartStyle == BatteryChartStyle.BAR) StatusSuccess else TextMuted,
-                            modifier = Modifier.size(16.dp)
+                        Text(
+                            text = "24-Uur Verbruik",
+                            color = if (timeframe == BatteryChartTimeframe.HOURS_24) AccentPrimary else TextMuted,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
                         )
                     }
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (chartStyle == BatteryChartStyle.LINE) StatusSuccess.copy(alpha = 0.25f) else Color.Transparent)
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (timeframe == BatteryChartTimeframe.DAYS_7) StatusSuccess.copy(alpha = 0.2f) else Color.Transparent)
+                            .border(
+                                1.dp,
+                                if (timeframe == BatteryChartTimeframe.DAYS_7) StatusSuccess.copy(alpha = 0.5f) else Color.Transparent,
+                                RoundedCornerShape(8.dp)
+                            )
                             .clickable {
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                chartStyle = BatteryChartStyle.LINE
+                                timeframe = BatteryChartTimeframe.DAYS_7
+                                selectedIndex = 6
                             }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .testTag("chart_type_line_button")
+                            .padding(vertical = 6.dp)
+                            .testTag("timeframe_7_days_button"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.ShowChart,
-                            contentDescription = "Line Chart",
-                            tint = if (chartStyle == BatteryChartStyle.LINE) StatusSuccess else TextMuted,
-                            modifier = Modifier.size(16.dp)
+                        Text(
+                            text = "7-Dagen Historie",
+                            color = if (timeframe == BatteryChartTimeframe.DAYS_7) StatusSuccess else TextMuted,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
                         )
                     }
                 }
@@ -298,11 +387,11 @@ fun BatteryHistoryChartCard(
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(Unit) {
+                        .pointerInput(activeDataset) {
                             detectTapGestures { tapOffset ->
-                                val widthPerBar = size.width / batteryHistory.size
-                                val clickedIdx = (tapOffset.x / widthPerBar).toInt().coerceIn(0, batteryHistory.size - 1)
-                                selectedDayIndex = clickedIdx
+                                val widthPerBar = size.width / activeDataset.size
+                                val clickedIdx = (tapOffset.x / widthPerBar).toInt().coerceIn(0, activeDataset.size - 1)
+                                selectedIndex = clickedIdx
                             }
                         }
                 ) {
@@ -311,7 +400,7 @@ fun BatteryHistoryChartCard(
                     val bottomPadding = 24.dp.toPx()
                     val topPadding = 16.dp.toPx()
                     val chartHeight = canvasHeight - bottomPadding - topPadding
-                    val count = batteryHistory.size
+                    val count = activeDataset.size
                     val itemWidth = canvasWidth / count
 
                     // Horizontal Grid Lines (0%, 25%, 50%, 75%, 100%)
@@ -329,27 +418,28 @@ fun BatteryHistoryChartCard(
 
                     if (chartStyle == BatteryChartStyle.BAR) {
                         // Render Bar Chart
-                        batteryHistory.forEachIndexed { idx, record ->
+                        activeDataset.forEachIndexed { idx, record ->
                             val xCenter = idx * itemWidth + itemWidth / 2f
                             val barWidth = itemWidth * 0.48f
                             val barLeft = xCenter - barWidth / 2f
 
-                            val drainRatio = (record.drainPercent / 100f).coerceIn(0f, 1f)
+                            val displayPercent = if (timeframe == BatteryChartTimeframe.HOURS_24) record.batteryLevelPercent else record.drainPercent
+                            val drainRatio = (displayPercent / 100f).coerceIn(0f, 1f)
                             val barHeight = chartHeight * drainRatio
                             val barTop = topPadding + (chartHeight - barHeight)
 
-                            val isSelected = idx == selectedDayIndex
+                            val isSelected = idx == selectedIndex
 
                             // Background highlight strip for selected day
                             if (isSelected) {
                                 drawRect(
-                                    color = StatusSuccess.copy(alpha = 0.12f),
+                                    color = AccentPrimary.copy(alpha = 0.12f),
                                     topLeft = Offset(idx * itemWidth, 0f),
                                     size = Size(itemWidth, canvasHeight)
                                 )
 
                                 drawLine(
-                                    color = StatusSuccess,
+                                    color = AccentPrimary,
                                     start = Offset(xCenter, topPadding),
                                     end = Offset(xCenter, topPadding + chartHeight),
                                     strokeWidth = 1.5.dp.toPx(),
@@ -359,8 +449,11 @@ fun BatteryHistoryChartCard(
 
                             // Main Drain Bar
                             val barColor = when {
-                                record.drainPercent > 60 -> StatusDanger
-                                record.drainPercent > 35 -> StatusOrange
+                                displayPercent > 80 && timeframe == BatteryChartTimeframe.HOURS_24 -> StatusSuccess
+                                displayPercent > 40 && timeframe == BatteryChartTimeframe.HOURS_24 -> StatusOrange
+                                displayPercent <= 20 && timeframe == BatteryChartTimeframe.HOURS_24 -> StatusDanger
+                                displayPercent > 60 -> StatusDanger
+                                displayPercent > 35 -> StatusOrange
                                 else -> StatusSuccess
                             }
 
@@ -384,9 +477,10 @@ fun BatteryHistoryChartCard(
                         }
                     } else {
                         // Render Line Chart with Area Fill
-                        val points = batteryHistory.mapIndexed { idx, record ->
+                        val points = activeDataset.mapIndexed { idx, record ->
                             val x = idx * itemWidth + itemWidth / 2f
-                            val drainRatio = (record.drainPercent / 100f).coerceIn(0f, 1f)
+                            val displayPercent = if (timeframe == BatteryChartTimeframe.HOURS_24) record.batteryLevelPercent else record.drainPercent
+                            val drainRatio = (displayPercent / 100f).coerceIn(0f, 1f)
                             val y = topPadding + chartHeight * (1f - drainRatio)
                             Offset(x, y)
                         }
@@ -410,12 +504,14 @@ fun BatteryHistoryChartCard(
                             close()
                         }
 
+                        val themeLineColor = if (timeframe == BatteryChartTimeframe.HOURS_24) AccentPrimary else StatusSuccess
+
                         drawPath(
                             path = fillPath,
                             brush = Brush.verticalGradient(
                                 colors = listOf(
-                                    StatusSuccess.copy(alpha = 0.35f),
-                                    StatusSuccess.copy(alpha = 0.02f)
+                                    themeLineColor.copy(alpha = 0.35f),
+                                    themeLineColor.copy(alpha = 0.02f)
                                 )
                             )
                         )
@@ -436,17 +532,17 @@ fun BatteryHistoryChartCard(
 
                         drawPath(
                             path = strokePath,
-                            color = StatusSuccess,
+                            color = themeLineColor,
                             style = Stroke(width = 3.dp.toPx())
                         )
 
                         // Draw points and highlight
                         points.forEachIndexed { idx, pt ->
-                            val isSelected = idx == selectedDayIndex
+                            val isSelected = idx == selectedIndex
 
                             if (isSelected) {
                                 drawLine(
-                                    color = StatusSuccess,
+                                    color = themeLineColor,
                                     start = Offset(pt.x, topPadding),
                                     end = Offset(pt.x, topPadding + chartHeight),
                                     strokeWidth = 1.5.dp.toPx(),
@@ -454,7 +550,7 @@ fun BatteryHistoryChartCard(
                                 )
 
                                 drawCircle(
-                                    color = StatusSuccess,
+                                    color = themeLineColor,
                                     radius = 7.dp.toPx(),
                                     center = pt
                                 )
@@ -470,7 +566,7 @@ fun BatteryHistoryChartCard(
                                     center = pt
                                 )
                                 drawCircle(
-                                    color = StatusSuccess,
+                                    color = themeLineColor,
                                     radius = 3.dp.toPx(),
                                     center = pt
                                 )
@@ -479,7 +575,7 @@ fun BatteryHistoryChartCard(
                     }
                 }
 
-                // Day Labels Row Overlay at bottom
+                // Time Labels Row Overlay at bottom
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -487,32 +583,33 @@ fun BatteryHistoryChartCard(
                         .padding(bottom = 2.dp),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
-                    batteryHistory.forEachIndexed { idx, record ->
-                        val isSelected = idx == selectedDayIndex
+                    activeDataset.forEachIndexed { idx, record ->
+                        val isSelected = idx == selectedIndex
+                        val themeLineColor = if (timeframe == BatteryChartTimeframe.HOURS_24) AccentPrimary else StatusSuccess
                         Text(
-                            text = record.dayLabel,
-                            color = if (isSelected) StatusSuccess else TextMuted,
+                            text = record.timeLabel,
+                            color = if (isSelected) themeLineColor else TextMuted,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 10.sp,
+                            fontSize = 9.sp,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
-                                .testTag("day_bar_item_$idx")
+                                .testTag("time_bar_item_$idx")
                                 .clickable {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                    selectedDayIndex = idx
+                                    selectedIndex = idx
                                 }
                         )
                     }
                 }
             }
 
-            // Detailed Breakdown Card for Selected Day
+            // Detailed Breakdown Card for Selected Record
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("selected_day_details_card"),
                 colors = CardDefaults.cardColors(containerColor = DarkBg),
-                border = BorderStroke(1.dp, StatusSuccess.copy(alpha = 0.3f)),
+                border = BorderStroke(1.dp, if (timeframe == BatteryChartTimeframe.HOURS_24) AccentPrimary.copy(alpha = 0.3f) else StatusSuccess.copy(alpha = 0.3f)),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
@@ -531,11 +628,11 @@ fun BatteryHistoryChartCard(
                             Icon(
                                 imageVector = Icons.Filled.CalendarToday,
                                 contentDescription = null,
-                                tint = StatusSuccess,
+                                tint = if (timeframe == BatteryChartTimeframe.HOURS_24) AccentPrimary else StatusSuccess,
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
-                                text = "Details: ${selectedRecord.dayLabel} (${selectedRecord.dateStr})",
+                                text = "Details: ${selectedRecord.fullDateStr}",
                                 color = TextPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
@@ -578,8 +675,13 @@ fun BatteryHistoryChartCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("Totaal Verbruikt", color = TextMuted, fontSize = 9.sp)
-                            Text("${selectedRecord.drainPercent}%", color = StatusOrange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(if (timeframe == BatteryChartTimeframe.HOURS_24) "Accu Niveau" else "Totaal Verbruikt", color = TextMuted, fontSize = 9.sp)
+                            Text(
+                                text = if (timeframe == BatteryChartTimeframe.HOURS_24) "${selectedRecord.batteryLevelPercent}%" else "${selectedRecord.drainPercent}%",
+                                color = if (timeframe == BatteryChartTimeframe.HOURS_24) AccentPrimary else StatusOrange,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
                         }
 
                         Column {
@@ -588,12 +690,12 @@ fun BatteryHistoryChartCard(
                         }
 
                         Column {
-                            Text("ANC Inschakeling", color = TextMuted, fontSize = 9.sp)
-                            Text("${selectedRecord.ancActivePercent}% van de tijd", color = HighlightSky, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("ANC Gebruik", color = TextMuted, fontSize = 9.sp)
+                            Text("${selectedRecord.ancActivePercent}% van tijd", color = HighlightSky, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
 
                         Column {
-                            Text("Piek Snelheid", color = TextMuted, fontSize = 9.sp)
+                            Text("Ontlaadsnelheid", color = TextMuted, fontSize = 9.sp)
                             Text(selectedRecord.peakDrainRate, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }

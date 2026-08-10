@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.example.R
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -975,6 +976,12 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                                 com.example.ui.Tah6519ConnectionDashboardCard(viewModel, settings)
                             }
                             item {
+                                com.example.ui.Tah6519MainAncModeSelectorCard(
+                                    viewModel = viewModel,
+                                    settings = settings
+                                )
+                            }
+                            item {
                                 val isSmartSaverActive = !settings.ancEnabled && !settings.ldacEnabled && settings.autoPowerOffMinutes == 5
                                 val isFetchingBattery by viewModel.isFetchingBattery.collectAsStateWithLifecycle()
                                 val batteryFetchProgress by viewModel.batteryFetchProgress.collectAsStateWithLifecycle()
@@ -1018,6 +1025,9 @@ fun HeadphoneApp(viewModel: HeadphoneViewModel) {
                             }
                             item {
                                 TechnicalConnectionStatsCard(viewModel, settings)
+                            }
+                            item {
+                                com.example.ui.Tah6519DeviceDetailsCard(viewModel = viewModel, settings = settings)
                             }
                             item {
                                 DashboardMediaWidget(viewModel, settings)
@@ -3144,6 +3154,9 @@ fun SectionHeader(title: String) {
 
 @Composable
 fun FrequencyResponseGraph(bands: List<Float>) {
+    // Harman Over-Ear 2018 Target Curve reference values across 10 bands
+    val harmanTargetBands = listOf(3.93f, 2.76f, -0.09f, -2.02f, -0.84f, 0.00f, 5.27f, 8.19f, 2.42f, -9.16f)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -3168,12 +3181,30 @@ fun FrequencyResponseGraph(bands: List<Float>) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Frequentierespons",
-                    color = TextMuted,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Frequentierespons",
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Box(
+                        modifier = Modifier
+                            .background(StatusOrange.copy(alpha = 0.15f), shape = RoundedCornerShape(4.dp))
+                            .border(0.5.dp, StatusOrange.copy(alpha = 0.4f), shape = RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "HARMAN TARGET 2018",
+                            color = StatusOrange,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
                 Text(
                     text = "Directe DSP Curve",
                     color = HighlightSky,
@@ -3202,7 +3233,37 @@ fun FrequencyResponseGraph(bands: List<Float>) {
                     strokeWidth = 1.dp.toPx()
                 )
 
-                // Compute mapped coordinates for the 10 bands
+                // Compute Harman Target reference points
+                val harmanPoints = harmanTargetBands.mapIndexed { i, gain ->
+                    val x = (i.toFloat() / 9f) * w
+                    val ratio = (gain + 12f) / 24f
+                    val y = 10f + (h - 20f) * (1f - ratio)
+                    Offset(x, y)
+                }
+
+                if (harmanPoints.isNotEmpty()) {
+                    val harmanPath = Path().apply {
+                        moveTo(harmanPoints[0].x, harmanPoints[0].y)
+                        for (i in 0 until harmanPoints.size - 1) {
+                            val p0 = harmanPoints[i]
+                            val p1 = harmanPoints[i + 1]
+                            val cx = (p0.x + p1.x) / 2f
+                            cubicTo(cx, p0.y, cx, p1.y, p1.x, p1.y)
+                        }
+                    }
+
+                    // Draw Harman reference curve as a subtle dashed amber curve
+                    drawPath(
+                        path = harmanPath,
+                        color = StatusOrange.copy(alpha = 0.65f),
+                        style = Stroke(
+                            width = 1.5.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f), 0f)
+                        )
+                    )
+                }
+
+                // Compute mapped coordinates for the 10 active DSP bands
                 val points = bands.mapIndexed { i, gain ->
                     val x = (i.toFloat() / 9f) * w
                     val ratio = (gain + 12f) / 24f // range -12 to +12
@@ -3248,6 +3309,30 @@ fun FrequencyResponseGraph(bands: List<Float>) {
                         ),
                         style = Stroke(width = 2.5.dp.toPx())
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Legend
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(modifier = Modifier.size(8.dp, 2.dp).background(HighlightSky))
+                    Text("Actieve EQ Curve", color = TextMuted, fontSize = 9.sp)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(modifier = Modifier.size(8.dp, 2.dp).background(StatusOrange))
+                    Text("Harman 2018 Target", color = TextMuted, fontSize = 9.sp)
                 }
             }
         }
@@ -8953,7 +9038,7 @@ fun DashboardQuickControls(viewModel: HeadphoneViewModel, settings: HeadphoneSet
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val quickPresets = listOf("Philips Signature", "Dynamic Bass", "Vocal Clarity", "Flat")
+                    val quickPresets = listOf("Harman Target", "Philips Signature", "Dynamic Bass", "Vocal Clarity", "Flat")
                     quickPresets.forEach { preset ->
                         val isSelected = settings.activePreset == preset
                         Button(
@@ -8978,6 +9063,7 @@ fun DashboardQuickControls(viewModel: HeadphoneViewModel, settings: HeadphoneSet
                         ) {
                             Text(
                                 text = when(preset) {
+                                    "Harman Target" -> "Harman"
                                     "Philips Signature" -> "Signature"
                                     "Dynamic Bass" -> "Bass"
                                     "Vocal Clarity" -> "Vocal"
@@ -8986,6 +9072,88 @@ fun DashboardQuickControls(viewModel: HeadphoneViewModel, settings: HeadphoneSet
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = DarkBorder, modifier = Modifier.padding(vertical = 2.dp))
+
+            // Audio Scenes (Music, Podcast, Gaming, Movie, Call)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Audio Scenes (Sfeer-Optimalisatie)",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        text = "EQ + Spatial + ANC",
+                        color = HighlightSky,
+                        fontSize = 9.sp
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val scenes = listOf(
+                        Triple("Music", "Muziek", Icons.Filled.MusicNote),
+                        Triple("Podcast", "Podcast", Icons.Filled.Podcasts),
+                        Triple("Gaming", "Gaming", Icons.Filled.SportsEsports),
+                        Triple("Movie", "Film", Icons.Filled.Movie),
+                        Triple("Call", "Bellen", Icons.Filled.Call)
+                    )
+                    scenes.forEach { (sceneKey, label, icon) ->
+                        val isCurrentScene = when (sceneKey) {
+                            "Music" -> settings.activePreset == "Harman Target" && settings.spatialAudioMode == "Stereo"
+                            "Podcast" -> settings.activePreset == "Vocal Clarity" && settings.spatialAudioMode == "Acoustic Studio"
+                            "Gaming" -> settings.activePreset == "Cinema 3D" && settings.spatialAudioMode == "Cinematic 3D"
+                            "Movie" -> settings.activePreset == "Cinema 3D" && settings.spatialAudioMode == "Live Concert"
+                            "Call" -> settings.activePreset == "Voice Clarity" && settings.sidetoneEnabled
+                            else -> false
+                        }
+
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.applyAudioScene(sceneKey)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("audio_scene_button_$sceneKey"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isCurrentScene) AccentPrimary else DarkBg,
+                                contentColor = if (isCurrentScene) Color.White else TextMuted
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = if (isCurrentScene) AccentPrimary else DarkBorder
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = label,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }

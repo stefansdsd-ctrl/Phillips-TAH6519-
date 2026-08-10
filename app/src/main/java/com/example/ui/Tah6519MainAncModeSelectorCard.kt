@@ -149,7 +149,7 @@ fun Tah6519MainAncModeSelectorCard(
 
                     Column {
                         Text(
-                            text = "Ruisbeheer (Noise Control)",
+                            text = "ANC Modus (Noise Control)",
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
@@ -173,7 +173,7 @@ fun Tah6519MainAncModeSelectorCard(
                             Text(
                                 text = when (settings.ancMode) {
                                     "ON" -> "Noise Cancelling Actief (-56 dB)"
-                                    "TRANSPARENCY" -> "Awareness (Omgevingsgeluid)"
+                                    "TRANSPARENCY" -> "Ambient Sound Actief (Awareness)"
                                     else -> "Off (Passieve Demping ~20 dB)"
                                 },
                                 color = when (settings.ancMode) {
@@ -314,7 +314,7 @@ fun Tah6519MainAncModeSelectorCard(
             ) {
                 val modeOptions = listOf(
                     Triple("ON", "Noise Cancelling", Icons.Filled.GraphicEq),
-                    Triple("TRANSPARENCY", "Awareness", Icons.Filled.Hearing),
+                    Triple("TRANSPARENCY", "Ambient Sound", Icons.Filled.Hearing),
                     Triple("OFF", "Off", Icons.Filled.PowerSettingsNew)
                 )
 
@@ -373,26 +373,26 @@ fun Tah6519MainAncModeSelectorCard(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = label,
                                     tint = textColor,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                                 Text(
                                     text = label,
                                     color = textColor,
-                                    fontSize = 11.sp,
+                                    fontSize = 10.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Text(
                                 text = when (modeCode) {
                                     "ON" -> "Ruisdemping"
-                                    "TRANSPARENCY" -> "Omgeving"
-                                    else -> "Passief"
+                                    "TRANSPARENCY" -> "Awareness"
+                                    else -> "Uit"
                                 },
                                 color = textColor.copy(alpha = 0.8f),
                                 fontSize = 9.sp

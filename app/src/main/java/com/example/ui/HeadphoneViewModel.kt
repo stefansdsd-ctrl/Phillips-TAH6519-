@@ -390,6 +390,7 @@ class HeadphoneViewModel(private val application: Application, private val repos
     ))
 
     val defaultPresets = mapOf(
+        "Harman Target" to listOf(3.93f, 2.76f, -0.09f, -2.02f, -0.84f, 0.00f, 5.27f, 8.19f, 2.42f, -9.16f),
         "Philips Signature" to listOf(3.5f, 2.5f, 1.0f, 0.0f, -0.5f, 0.5f, 1.5f, 2.5f, 3.5f, 2.5f),
         "Bass Boost" to listOf(8.5f, 7.0f, 5.0f, 2.5f, 0.0f, -0.5f, 0.0f, 0.5f, 1.0f, 0.5f),
         "Vocal Clarity" to listOf(-3.0f, -2.0f, 0.0f, 2.5f, 5.0f, 5.5f, 4.0f, 2.0f, -1.0f, -2.0f),
@@ -1621,6 +1622,72 @@ class HeadphoneViewModel(private val application: Application, private val repos
         if (bands != null) {
             updateSettings { current ->
                 current.copyWithBands(bands).copy(activePreset = preset)
+            }
+        }
+    }
+
+    fun applyAudioScene(sceneName: String) {
+        when (sceneName) {
+            "Music" -> {
+                val bands = presets["Harman Target"] ?: listOf(3.93f, 2.76f, -0.09f, -2.02f, -0.84f, 0.00f, 5.27f, 8.19f, 2.42f, -9.16f)
+                updateSettings { current ->
+                    current.copyWithBands(bands).copy(
+                        activePreset = "Harman Target",
+                        spatialAudioMode = "Stereo",
+                        ancMode = "ON",
+                        ancEnabled = true,
+                        sidetoneEnabled = false
+                    )
+                }
+            }
+            "Podcast" -> {
+                val bands = presets["Vocal Clarity"] ?: listOf(-3.0f, -2.0f, 0.0f, 2.5f, 5.0f, 5.5f, 4.0f, 2.0f, -1.0f, -2.0f)
+                updateSettings { current ->
+                    current.copyWithBands(bands).copy(
+                        activePreset = "Vocal Clarity",
+                        spatialAudioMode = "Acoustic Studio",
+                        ancMode = "TRANSPARENCY",
+                        ancEnabled = false,
+                        sidetoneEnabled = true
+                    )
+                }
+            }
+            "Gaming" -> {
+                val bands = presets["Cinema 3D"] ?: listOf(6.0f, 4.5f, 2.0f, 0.0f, -1.0f, 1.0f, 3.0f, 4.0f, 4.5f, 3.5f)
+                updateSettings { current ->
+                    current.copyWithBands(bands).copy(
+                        activePreset = "Cinema 3D",
+                        spatialAudioMode = "Cinematic 3D",
+                        ancMode = "ON",
+                        ancEnabled = true,
+                        dynamicBassEnabled = true
+                    )
+                }
+            }
+            "Movie" -> {
+                val bands = presets["Cinema 3D"] ?: listOf(6.0f, 4.5f, 2.0f, 0.0f, -1.0f, 1.0f, 3.0f, 4.0f, 4.5f, 3.5f)
+                updateSettings { current ->
+                    current.copyWithBands(bands).copy(
+                        activePreset = "Cinema 3D",
+                        spatialAudioMode = "Live Concert",
+                        ancMode = "ON",
+                        ancEnabled = true,
+                        surroundSoundEnabled = true
+                    )
+                }
+            }
+            "Call" -> {
+                val bands = presets["Voice Clarity"] ?: listOf(-3.0f, -2.0f, 0.0f, 2.5f, 5.0f, 5.5f, 4.0f, 2.0f, -1.0f, -2.0f)
+                updateSettings { current ->
+                    current.copyWithBands(bands).copy(
+                        activePreset = "Voice Clarity",
+                        spatialAudioMode = "Stereo",
+                        ancMode = "TRANSPARENCY",
+                        ancEnabled = false,
+                        sidetoneEnabled = true,
+                        sidetoneLevel = 75
+                    )
+                }
             }
         }
     }
