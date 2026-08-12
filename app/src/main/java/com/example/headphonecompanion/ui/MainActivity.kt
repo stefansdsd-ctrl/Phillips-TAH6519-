@@ -22,19 +22,38 @@ import androidx.compose.ui.unit.dp
 import com.example.headphonecompanion.audio.EqualizerManager
 import com.example.headphonecompanion.bluetooth.BatteryGattReader
 import com.example.headphonecompanion.dsp.ParametricEq
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.google.android.exoplayer2.ExoPlayer
+import com.example.headphonecompanion.profiles.ProfileImporter
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 
 class MainActivity : ComponentActivity() {
     private lateinit var reader: BatteryGattReader
     private var player: ExoPlayer? = null
+    private var importScope: CoroutineScope? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         reader = BatteryGattReader(applicationContext)
 
         player = ExoPlayer.Builder(this).build()
+
+        importScope = CoroutineScope(Dispatchers.IO + Job())
+        // Auto-import sample profiles from assets on first launch
+        importScope?.launch {
+            try {
+                val importer = ProfileImporter(applicationContext)
+                importer.importFromAssets("profiles/tah6519_profile.json")
+                importer.importFromAssets("profiles/acer_galea_311_profile.json")
+            } catch (e: Exception) {
+                // ignore import errors; they will be visible in logs
+            }
+        }
 
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -62,6 +81,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         reader.close()
         player?.release()
+        importScope?.cancel()
     }
 }
 
@@ -71,6 +91,7 @@ fun AppContent(reader: BatteryGattReader, requestPermission: (Array<String>) -> 
     var devices by remember { mutableStateOf<List<android.bluetooth.BluetoothDevice>>(emptyList()) }
     var selectedBattery by remember { mutableStateOf<Int?>(null) }
     var showEq by remember { mutableStateOf(false) }
+    var showHearingTest by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         devices = reader.listPairedAudioDevices()
@@ -91,6 +112,10 @@ fun AppContent(reader: BatteryGattReader, requestPermission: (Array<String>) -> 
 
         Button(onClick = { showEq = !showEq }, modifier = Modifier.padding(top = 8.dp)) {
             Text(if (showEq) "Hide EQ" else "Open EQ")
+        }
+
+        Button(onClick = { showHearingTest = !showHearingTest }, modifier = Modifier.padding(top = 8.dp)) {
+            Text(if (showHearingTest) "Close Hearing Test" else "Start Hearing Test")
         }
 
         Text("Paired devices:", modifier = Modifier.padding(top = 12.dp))
@@ -116,6 +141,16 @@ fun AppContent(reader: BatteryGattReader, requestPermission: (Array<String>) -> 
                 val audioSessionId = player?.audioSessionId ?: 0
                 val manager = EqualizerManager(audioSessionId)
                 manager.applyParametricEq(eq)
+            })
+        }
+
+        if (showHearingTest) {
+            HearingTestScreen(onDone = { eq ->
+                // Apply EQ from hearing test
+                val audioSessionId = player?.audioSessionId ?: 0
+                val manager = EqualizerManager(audioSessionId)
+                manager.applyParametricEq(eq)
+                showHearingTest = false
             })
         }
     }

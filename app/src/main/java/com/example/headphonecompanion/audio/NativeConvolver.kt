@@ -1,15 +1,14 @@
 package com.example.headphonecompanion.audio
 
+/**
+ * Kotlin wrapper that calls the Java JNI bridge. Returns null if native library is unavailable.
+ */
 object NativeConvolver {
-    init {
-        // library not yet built into the Android build; this is a placeholder for the JNI library
-        try {
-            System.loadLibrary("native_convolver")
-        } catch (e: Throwable) {
-            // library not available yet
+    fun convolve(input: FloatArray, ir: FloatArray): FloatArray? {
+        return try {
+            com.example.headphonecompanion.audio.NativeConvolverBridge.convolve(input, ir)
+        } catch (t: Throwable) {
+            null
         }
     }
-
-    // Placeholder JNI wrapper. Implement JNI functions in native layer when integrating.
-    external fun convolve(input: FloatArray, ir: FloatArray): FloatArray
 }

@@ -13,6 +13,19 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1"
+
+        // Configure externalNativeBuild (CMake) to allow building the native convolver when NDK is installed.
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17 -O3"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     buildFeatures {
@@ -21,8 +34,6 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.3"
     }
-
-    // Note: NDK / externalNativeBuild integration is not yet configured. See app/native/README.md for steps.
 }
 
 dependencies {
